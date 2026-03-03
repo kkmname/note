@@ -17,12 +17,13 @@ const Home = (() => {
         Variables & Constants
     ================================================== */
     let mdeInstance  = null;
-    let currentNote  = null;   /* ArticleResponse */
+    let currentNote  = null;
     let isEditMode   = false;
-    let ctxTarget    = null;   /* { type:'root'|'subject'|'note', subjectId?, noteId? } */
+    let ctxTarget    = null;
     let modalAction  = null;
     let toastTimer   = null;
-    let subjectCache = [];     /* SubjectResponse[] */
+    let subjectCache = [];
+    let dnd          = null; /* [FIX-2] { type, noteId?, subjectId?, fromSubjectId?, el } */
 
     const LS_THEME = "journal:theme";
     const SS_AUTH  = "note:auth";
@@ -30,40 +31,40 @@ const Home = (() => {
     /* ==================================================
         DOM refs
     ================================================== */
-    const $               = (sel) => document.querySelector(sel);
-    const themeBtn        = $("#themeBtn");
-    const toastEl         = $("#toast");
-    const toastTxt        = $("#toastText");
-    const newNoteBtn      = $("#newNoteBtn");
-    const newFolderBtn    = $("#newFolderBtn");
-    const logoutBtn       = $("#logoutBtn");
-    const editModeBtn     = $("#editModeBtn");
-    const editModeBtnText = $("#editModeBtnText");
-    const saveBtn         = $("#saveBtn");
-    const editorTitle     = $("#editorTitle");
-    const editorActions   = $("#editorActions");
-    const editorEmpty     = $("#editorEmpty");
-    const mdeTarget       = $("#mdeTarget");
-    const noteCount       = $("#noteCount");
-    const treeEl          = $("#tree");
-    const ctxMenu         = $("#ctxMenu");
-    const ctxNewNote      = $("#ctxNewNote");
-    const ctxNewFolder    = $("#ctxNewFolder");
-    const ctxRename       = $("#ctxRename");
-    const ctxDelete       = $("#ctxDelete");
-    const modalBackdrop   = $("#modalBackdrop");
-    const modalTitle      = $("#modalTitle");
-    const modalInput      = $("#modalInput");
-    const modalLabel      = $("#modalLabel");
+    const $                  = (sel) => document.querySelector(sel);
+    const themeBtn           = $("#themeBtn");
+    const toastEl            = $("#toast");
+    const toastTxt           = $("#toastText");
+    const newNoteBtn         = $("#newNoteBtn");
+    const newFolderBtn       = $("#newFolderBtn");
+    const logoutBtn          = $("#logoutBtn");
+    const editModeBtn        = $("#editModeBtn");
+    const editModeBtnText    = $("#editModeBtnText");
+    const saveBtn            = $("#saveBtn");
+    const editorTitle        = $("#editorTitle");
+    const editorActions      = $("#editorActions");
+    const editorEmpty        = $("#editorEmpty");
+    const mdeTarget          = $("#mdeTarget");
+    const noteCount          = $("#noteCount");
+    const treeEl             = $("#tree");
+    const ctxMenu            = $("#ctxMenu");
+    const ctxNewNote         = $("#ctxNewNote");
+    const ctxNewFolder       = $("#ctxNewFolder");
+    const ctxRename          = $("#ctxRename");
+    const ctxDelete          = $("#ctxDelete");
+    const modalBackdrop      = $("#modalBackdrop");
+    const modalTitle         = $("#modalTitle");
+    const modalInput         = $("#modalInput");
+    const modalLabel         = $("#modalLabel");
     const modalFolderField   = $("#modalFolderField");
     const modalFolderSelect  = $("#modalFolderSelect");
-    const modalClose      = $("#modalClose");
-    const modalCancel     = $("#modalCancel");
-    const modalSubmit     = $("#modalSubmit");
-    const sidebarBody     = $("#sidebarBody");
-    const sidebarEl       = $("#sidebar");
-    const editorPanel     = $("#editorPanel");
-    const mobileBackBtn   = $("#mobileBackBtn");
+    const modalClose         = $("#modalClose");
+    const modalCancel        = $("#modalCancel");
+    const modalSubmit        = $("#modalSubmit");
+    const sidebarBody        = $("#sidebarBody");
+    const sidebarEl          = $("#sidebar");
+    const editorPanel        = $("#editorPanel");
+    const mobileBackBtn      = $("#mobileBackBtn");
 
     /* ==================================================
         Event Handlers
@@ -77,14 +78,17 @@ const Home = (() => {
         });
 
         newNoteBtn.addEventListener("click", () => {
+            if (subjectCache.length === 0) { toast("먼저 폴더를 만들어주세요."); return; }
             openModal("새 노트", "노트 제목", true, (name) => {
                 const subjectId = modalFolderSelect.value ? Number(modalFolderSelect.value) : null;
+                if (!subjectId) { toast("폴더를 선택해주세요."); return; }
                 createNote(name, subjectId);
             });
         });
 
         newFolderBtn.addEventListener("click", () => {
-            openModal("새 폴더", "폴더 이름", false, createSubject);
+            /* [FIX-3] 최상위 폴더 생성 — parentId null */
+            openModal("새 폴더", "폴더 이름", false, (name) => createSubject(name, null));
         });
 
         editModeBtn.addEventListener("click", toggleEditMode);
@@ -98,9 +102,13 @@ const Home = (() => {
             );
         });
 
+        /* [FIX-3] subject 컨텍스트면 해당 subject 하위에 폴더 생성 */
         ctxNewFolder.addEventListener("click", () => {
+            const parentId = ctxTarget?.type === "subject"
+                ? Number(ctxTarget.subjectId)
+                : null;
             closeCtxMenu();
-            openModal("새 폴더", "폴더 이름", false, createSubject);
+            openModal("새 폴더", "폴더 이름", false, (name) => createSubject(name, parentId));
         });
 
         ctxRename.addEventListener("click", () => {
@@ -148,6 +156,30 @@ const Home = (() => {
             }
         });
 
+        /* [FIX-2] Sidebar body: 루트 드롭 타겟 */
+        sidebarBody.addEventListener("dragover", (e) => {
+            if (!dnd) return;
+            if (e.target.closest(".tree-folder-row")) return;
+            if (dnd.type === "note"    && dnd.fromSubjectId === null) return;
+            if (dnd.type === "subject" && isSubjectRoot(dnd.subjectId)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            sidebarBody.classList.add("dnd-root-over");
+        });
+        sidebarBody.addEventListener("dragleave", (e) => {
+            if (!sidebarBody.contains(e.relatedTarget))
+                sidebarBody.classList.remove("dnd-root-over");
+        });
+        sidebarBody.addEventListener("drop", (e) => {
+            sidebarBody.classList.remove("dnd-root-over");
+            if (!dnd) return;
+            if (e.target.closest(".tree-folder-row")) return;
+            e.preventDefault();
+            if (dnd.type === "note"    && dnd.fromSubjectId !== null) moveNote(dnd.noteId, dnd.fromSubjectId, null);
+            if (dnd.type === "subject")                                moveSubject(dnd.subjectId, null);
+            endDnd();
+        });
+
         window.addEventListener("resize", () => {
             if (window.innerWidth > 768) {
                 sidebarEl.classList.remove("mobile-hidden");
@@ -185,15 +217,17 @@ const Home = (() => {
             return;
         }
 
-        const roots = subjectCache.filter(s => (s.parentId ?? null) === null);
+        const roots = subjectCache
+            .filter(s => (s.parentId ?? null) === null)
+            .sort((a, b) => a.name.localeCompare(b.name, "ko"));
         roots.forEach(s => treeEl.appendChild(makeSubjectItem(s)));
 
-        noteCount.textContent = `${subjectCache.length}개의 폴더`;
+        noteCount.textContent = subjectCache.length + "개의 폴더";
 
         if (subjectCache.length === 0) {
             const hint = document.createElement("li");
             hint.className   = "tree-empty";
-            hint.textContent = "폴더가 없습니다.\n+ 버튼으로 폴더를 만들어보세요.";
+            hint.textContent = "폴더가 없습니다.";
             treeEl.appendChild(hint);
         }
 
@@ -201,23 +235,25 @@ const Home = (() => {
     }
 
     function makeSubjectItem(subject) {
-        const children = subjectCache.filter(s => s.parentId === subject.id);
+        const children = subjectCache
+            .filter(s => s.parentId === subject.id)
+            .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
         const li = document.createElement("li");
-        li.role             = "treeitem";
-        li.className        = "tree-folder-item";
+        li.role              = "treeitem";
+        li.className         = "tree-folder-item";
+        li.draggable         = true;                /* [FIX-2] */
         li.dataset.subjectId = subject.id;
 
         const row = document.createElement("div");
         row.className = "tree-folder-row";
-        row.innerHTML = `
-            <svg class="tree-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="folder-emoji" aria-hidden="true">📁</span>
-            <span class="tree-folder-name">${escHtml(subject.name)}</span>
-            <span class="tree-folder-count">${children.length}</span>
-        `;
+        row.innerHTML =
+            '<svg class="tree-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+                '<path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '</svg>' +
+            '<span class="folder-emoji" aria-hidden="true">\u{1F4C1}</span>' +
+            '<span class="tree-folder-name">' + escHtml(subject.name) + '</span>' +
+            '<span class="tree-folder-count">' + children.length + '</span>';
 
         row.addEventListener("click", () => toggleSubjectFolder(li, subject.id));
         row.addEventListener("contextmenu", (e) => {
@@ -226,9 +262,49 @@ const Home = (() => {
             openCtxMenu(e, { type: "subject", subjectId: subject.id });
         });
 
+        /* [FIX-2] Subject drag */
+        li.addEventListener("dragstart", (e) => {
+            if (e.target.closest(".tree-note-row")) return;
+            /* 하위 중첩 li에서 bubble된 경우 — 가장 가까운 tree-folder-item이 이 li여야만 처리 */
+            if (e.target.closest(".tree-folder-item") !== li) return;
+            e.stopPropagation();
+            dnd = { type: "subject", subjectId: subject.id, el: li };
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", "subject");
+            setTimeout(() => li.classList.add("dnd-dragging"), 0);
+        });
+        li.addEventListener("dragend", endDnd);
+
+        /* [FIX-2] Subject row drop target */
+        row.addEventListener("dragover", (e) => {
+            if (!dnd) return;
+            if (dnd.type === "subject") {
+                if (String(dnd.subjectId) === String(subject.id)) return;
+                if (isSubjectDescendant(dnd.subjectId, subject.id)) return;
+            }
+            if (dnd.type === "note" && String(dnd.fromSubjectId) === String(subject.id)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            document.querySelectorAll(".tree-folder-row.dnd-over")
+                .forEach(el => el.classList.remove("dnd-over"));
+            row.classList.add("dnd-over");
+        });
+        row.addEventListener("dragleave", (e) => {
+            if (!row.contains(e.relatedTarget)) row.classList.remove("dnd-over");
+        });
+        row.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            row.classList.remove("dnd-over");
+            if (!dnd) return;
+            if (dnd.type === "note")    moveNote(dnd.noteId, dnd.fromSubjectId, subject.id);
+            if (dnd.type === "subject") moveSubject(dnd.subjectId, subject.id);
+            endDnd();
+        });
+
         const childrenEl = document.createElement("ul");
-        childrenEl.className        = "tree-children";
-        childrenEl.role             = "group";
+        childrenEl.className         = "tree-children";
+        childrenEl.role              = "group";
         childrenEl.dataset.subjectId = subject.id;
 
         children.forEach(c => childrenEl.appendChild(makeSubjectItem(c)));
@@ -236,16 +312,23 @@ const Home = (() => {
         li.appendChild(row);
         li.appendChild(childrenEl);
 
-        if (sessionStorage.getItem(`subject-open:${subject.id}`) === "1") {
+        if (sessionStorage.getItem("subject-open:" + subject.id) === "1") {
             childrenEl.classList.add("open");
             row.querySelector(".tree-chevron").classList.add("open");
-            row.querySelector(".folder-emoji").textContent = "📂";
+            row.querySelector(".folder-emoji").textContent = "\u{1F4C2}";
             loadNotesIntoFolder(subject.id, childrenEl);
         }
 
         return li;
     }
 
+    /* ==================================================
+        Load Notes Into Folder
+        [FIX-1] 닫았다 열어도 중복 방지
+        - notesLoaded="1" 이면 스킵
+        - 강제 갱신 필요 시 호출 전 "0"으로 세팅
+        - 기존 note row를 먼저 제거 후 재삽입 (안전장치)
+    ================================================== */
     async function loadNotesIntoFolder(subjectId, childrenEl) {
         if (childrenEl.dataset.notesLoaded === "1") return;
 
@@ -258,31 +341,33 @@ const Home = (() => {
             return;
         }
 
-        articles.forEach(article => childrenEl.appendChild(makeNoteRow(article)));
+        /* 기존 note row 제거 후 이름순 정렬하여 재삽입 */
+        childrenEl.querySelectorAll(".tree-note-row").forEach(el => el.remove());
+        articles
+            .sort((a, b) => (a.title || "").localeCompare(b.title || "", "ko"))
+            .forEach(article => childrenEl.appendChild(makeNoteRow(article)));
         childrenEl.dataset.notesLoaded = "1";
 
-        const li      = childrenEl.closest(".tree-folder-item");
-        const badge   = li?.querySelector(".tree-folder-count");
+        const li       = childrenEl.closest(".tree-folder-item");
+        const badge    = li ? li.querySelector(":scope > .tree-folder-row .tree-folder-count") : null;
         const subCount = subjectCache.filter(s => s.parentId === Number(subjectId)).length;
         if (badge) badge.textContent = subCount + articles.length;
     }
 
     function makeNoteRow(article) {
         const li = document.createElement("li");
-        li.role          = "treeitem";
-        li.className     = "tree-note-row";
+        li.role           = "treeitem";
+        li.className      = "tree-note-row";
+        li.draggable      = true;                   /* [FIX-2] */
         li.dataset.noteId = article.id;
 
-        li.innerHTML = `
-            <svg class="tree-note-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z"
-                      stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
-                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"
-                      stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            </svg>
-            <span class="tree-note-name">${escHtml(article.title || "제목 없음")}</span>
-            <span class="tree-note-date">${shortDate(article.modifiedAt || article.createdAt)}</span>
-        `;
+        li.innerHTML =
+            '<svg class="tree-note-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+                '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>' +
+                '<path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>' +
+            '</svg>' +
+            '<span class="tree-note-name">' + escHtml(article.title || "제목 없음") + '</span>' +
+            '<span class="tree-note-date">' + shortDate(article.modifiedAt || article.createdAt) + '</span>';
 
         li.addEventListener("click", () => openNote(article.id));
         li.addEventListener("contextmenu", (e) => {
@@ -291,9 +376,21 @@ const Home = (() => {
             openCtxMenu(e, { type: "note", subjectId: article.subjectId, noteId: article.id });
         });
 
+        /* [FIX-2] Note drag */
+        li.addEventListener("dragstart", (e) => {
+            e.stopPropagation(); /* [FIX] 중첩 li bubble 방지 */
+            dnd = { type: "note", noteId: article.id, fromSubjectId: article.subjectId ?? null, el: li };
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", "note");
+            setTimeout(() => li.classList.add("dnd-dragging"), 0);
+        });
+        li.addEventListener("dragend", endDnd);
+
         return li;
     }
 
+    /* [FIX-1] 닫을 때 notesLoaded 를 초기화하지 않음
+       → 재열기 시 "1"이므로 스킵 (중복 없음) */
     async function toggleSubjectFolder(li, subjectId) {
         const childrenEl = li.querySelector(".tree-children");
         const chevron    = li.querySelector(".tree-chevron");
@@ -301,21 +398,81 @@ const Home = (() => {
         const isOpen     = childrenEl.classList.toggle("open");
 
         chevron.classList.toggle("open", isOpen);
-        emoji.textContent = isOpen ? "📂" : "📁";
+        emoji.textContent = isOpen ? "\u{1F4C2}" : "\u{1F4C1}";
 
-        if (isOpen) {
-            await loadNotesIntoFolder(subjectId, childrenEl);
-        } else {
-            childrenEl.dataset.notesLoaded = "0";
-        }
+        if (isOpen) await loadNotesIntoFolder(subjectId, childrenEl);
 
-        try { sessionStorage.setItem(`subject-open:${subjectId}`, isOpen ? "1" : "0"); } catch (e) {}
+        try { sessionStorage.setItem("subject-open:" + subjectId, isOpen ? "1" : "0"); } catch (e) {}
     }
 
     function highlightNote(noteId) {
         document.querySelectorAll(".tree-note-row").forEach(el =>
             el.classList.toggle("active", String(el.dataset.noteId) === String(noteId))
         );
+    }
+
+    /* ==================================================
+        Drag & Drop  [FIX-2]
+    ================================================== */
+    function endDnd() {
+        if (!dnd) return;
+        dnd.el && dnd.el.classList.remove("dnd-dragging");
+        document.querySelectorAll(".dnd-over").forEach(el => el.classList.remove("dnd-over"));
+        sidebarBody.classList.remove("dnd-root-over");
+        dnd = null;
+    }
+
+    async function moveNote(noteId, fromSubjectId, toSubjectId) {
+        if (String(fromSubjectId) === String(toSubjectId)) return;
+        try {
+            await Article_API.moveArticle(noteId, toSubjectId);
+            toast("노트 이동 완료");
+            invalidateFolder(fromSubjectId);
+            invalidateFolder(toSubjectId);
+            await renderTree();
+            if (currentNote && String(currentNote.id) === String(noteId))
+                currentNote.subjectId = toSubjectId;
+        } catch (e) { toast("노트 이동에 실패했습니다."); }
+    }
+
+    async function moveSubject(subjectId, intoSubjectId) {
+        if (String(subjectId) === String(intoSubjectId)) return;
+        if (intoSubjectId && isSubjectDescendant(subjectId, intoSubjectId)) {
+            toast("하위 폴더로 이동할 수 없습니다.");
+            return;
+        }
+        try {
+            await Subject_API.moveSubject(subjectId, intoSubjectId ?? null);
+            toast("폴더 이동 완료");
+            await renderTree();
+        } catch (e) { toast("폴더 이동에 실패했습니다."); }
+    }
+
+    function isSubjectRoot(subjectId) {
+        const s = subjectCache.find(x => String(x.id) === String(subjectId));
+        return s ? (s.parentId ?? null) === null : true;
+    }
+
+    function isSubjectDescendant(ancestorId, checkId) {
+        /* ancestorId 의 자손 전체를 DFS로 수집 후 checkId 포함 여부 확인 */
+        function collectDescendants(id, set) {
+            subjectCache
+                .filter(s => String(s.parentId) === String(id))
+                .forEach(s => {
+                    set.add(String(s.id));
+                    collectDescendants(s.id, set);
+                });
+        }
+        const descendants = new Set();
+        collectDescendants(ancestorId, descendants);
+        return descendants.has(String(checkId));
+    }
+
+    function invalidateFolder(subjectId) {
+        if (subjectId == null) return;
+        const li = document.querySelector('[data-subject-id="' + subjectId + '"]');
+        const ch = li ? li.querySelector(".tree-children") : null;
+        if (ch) ch.dataset.notesLoaded = "0";
     }
 
     /* ==================================================
@@ -333,18 +490,18 @@ const Home = (() => {
         currentNote = article;
         isEditMode  = false;
 
-        editorTitle.textContent = article.title || "제목 없음";
+        editorTitle.textContent      = article.title || "제목 없음";
         editorTitle.classList.remove("placeholder");
-        editorActions.style.display = "flex";
-        editorEmpty.style.display   = "none";
-        mdeTarget.style.display     = "";
+        editorActions.style.display  = "flex";
+        editorEmpty.style.display    = "none";
+        mdeTarget.style.display      = "";
         editModeBtnText.textContent  = "편집";
 
         highlightNote(article.id);
         showEditorOnMobile();
 
         if (article.subjectId) {
-            const li = document.querySelector(`.tree-folder-item[data-subject-id="${article.subjectId}"]`);
+            const li = document.querySelector('.tree-folder-item[data-subject-id="' + article.subjectId + '"]');
             if (li) {
                 const ch = li.querySelector(".tree-children");
                 if (ch && !ch.classList.contains("open")) await toggleSubjectFolder(li, article.subjectId);
@@ -369,7 +526,7 @@ const Home = (() => {
                 initialValue: content,
                 spellChecker: false,
                 lineWrapping: true,
-                placeholder:  "마크다운으로 내용을 작성하세요…",
+                placeholder:  "마크다운으로 내용을 작성하세요\u2026",
                 autofocus:    editMode,
                 toolbar: [
                     "bold", "italic", "heading", "|",
@@ -404,14 +561,14 @@ const Home = (() => {
         input.onchange = function () {
             const file = this.files[0];
             if (!file) return;
-            toast("이미지 읽는 중…");
+            toast("이미지 읽는 중\u2026");
             const reader = new FileReader();
             reader.onload = (ev) => {
                 const cm  = editor.codemirror;
                 const alt = file.name.replace(/\.[^.]+$/, "");
-                cm.replaceSelection(`![${alt}](${ev.target.result})`);
+                cm.replaceSelection("![" + alt + "](" + ev.target.result + ")");
                 cm.focus();
-                toast("이미지 삽입됨 ✓");
+                toast("이미지 삽입됨 \u2713");
             };
             reader.onerror = () => toast("이미지 읽기 실패");
             reader.readAsDataURL(file);
@@ -447,9 +604,9 @@ const Home = (() => {
         try {
             const updated = await Article_API.saveArticle(payload);
             currentNote   = updated;
-            toast("저장되었습니다 ✓");
-            const noteRow = document.querySelector(`.tree-note-row[data-note-id="${currentNote.id}"]`);
-            const dateEl  = noteRow?.querySelector(".tree-note-date");
+            toast("저장되었습니다 \u2713");
+            const noteRow = document.querySelector('.tree-note-row[data-note-id="' + currentNote.id + '"]');
+            const dateEl  = noteRow ? noteRow.querySelector(".tree-note-date") : null;
             if (dateEl) dateEl.textContent = shortDate(currentNote.modifiedAt);
         } catch (e) {
             toast("저장에 실패했습니다.");
@@ -468,61 +625,57 @@ const Home = (() => {
             mdeInstance = null;
         }
 
-        mdeTarget.style.display       = "none";
-        editorTitle.textContent       = "노트를 선택하세요";
+        mdeTarget.style.display      = "none";
+        editorTitle.textContent      = "노트를 선택하세요";
         editorTitle.classList.add("placeholder");
-        editorActions.style.display   = "none";
-        editorEmpty.style.display     = "flex";
+        editorActions.style.display  = "none";
+        editorEmpty.style.display    = "flex";
 
         document.querySelectorAll(".tree-note-row").forEach(el => el.classList.remove("active"));
         showSidebarOnMobile();
     }
 
     /* ==================================================
-        CRUD — Note
+        CRUD - Note
     ================================================== */
     async function createNote(title, subjectId) {
-        const payload = {
-            title:     title || "제목 없음",
-            contents:  "",
-            subjectId: subjectId ?? null,
-            sortOrder: 0,
-        };
+        if (!subjectId) { toast("폴더를 선택해주세요."); return; }
 
         let article;
         try {
-            article = await Article_API.saveArticle(payload);
-            toast(`'${title}' 노트 생성됨`);
+            article = await Article_API.saveArticle({
+                title:     title || "제목 없음",
+                contents:  "",
+                subjectId: subjectId,
+                sortOrder: 0,
+            });
+            toast("'" + title + "' 노트 생성됨");
         } catch (e) {
             toast("노트 생성에 실패했습니다.");
             return;
         }
 
-        if (subjectId) {
-            const li = document.querySelector(`.tree-folder-item[data-subject-id="${subjectId}"]`);
-            if (li) {
-                const ch = li.querySelector(".tree-children");
-                ch.dataset.notesLoaded = "0";
-                if (!ch.classList.contains("open")) {
-                    await toggleSubjectFolder(li, subjectId);
-                } else {
-                    await loadNotesIntoFolder(subjectId, ch);
-                }
+        const li = document.querySelector('.tree-folder-item[data-subject-id="' + subjectId + '"]');
+        if (li) {
+            const ch = li.querySelector(".tree-children");
+            ch.dataset.notesLoaded = "0";
+            if (!ch.classList.contains("open")) {
+                await toggleSubjectFolder(li, subjectId);
+            } else {
+                await loadNotesIntoFolder(subjectId, ch);
             }
-        } else {
-            await renderTree();
         }
-
         await openNote(article.id);
     }
 
     /* ==================================================
-        CRUD — Subject
+        CRUD - Subject
+        [FIX-3] parentId 인자 추가
     ================================================== */
-    async function createSubject(name) {
+    async function createSubject(name, parentId) {
         try {
-            await Subject_API.saveSubject({ name, parentId: null, sortOrder: 0 });
-            toast(`'${name}' 폴더 생성됨`);
+            await Subject_API.saveSubject({ name, parentId: parentId ?? null, sortOrder: 0 });
+            toast("'" + name + "' 폴더 생성됨");
             await renderTree();
         } catch (e) {
             toast("폴더 생성에 실패했습니다.");
@@ -585,43 +738,28 @@ const Home = (() => {
 
     /* ==================================================
         Context Menu
+        [FIX-3] subject 컨텍스트에서 ctxNewFolder 표시
     ================================================== */
     function openCtxMenu(e, target) {
         ctxTarget = target;
 
-        const showItem = (id, show) => {
+        /* 타입별 가시성 테이블: [ctxNewNote, ctxNewFolder, ctxRename, ctxDelete, ctx-sep-rename] */
+        const VIS = {
+            root:    [false, true,  false, false, false],
+            subject: [true,  true,  true,  true,  true ],
+            note:    [false, false, true,  true,  true ],
+        };
+        const ids = ["ctxNewNote", "ctxNewFolder", "ctxRename", "ctxDelete"];
+        const vis = VIS[target.type] ?? VIS.note;
+        ids.forEach((id, i) => {
             const el = document.getElementById(id);
-            if (el) el.style.display = show ? "flex" : "none";
-        };
-        const showSep = (cls, show) => {
-            const el = document.querySelector(`.${cls}`);
-            if (el) el.style.display = show ? "block" : "none";
-        };
+            if (el) el.style.display = vis[i] ? "flex" : "none";
+        });
+        const sep = document.querySelector(".ctx-sep-rename");
+        if (sep) sep.style.display = vis[4] ? "block" : "none";
 
-        if (target.type === "root") {
-            showItem("ctxNewNote",   false);
-            showItem("ctxNewFolder", true);
-            showItem("ctxRename",    false);
-            showItem("ctxDelete",    false);
-            showSep("ctx-sep-rename", false);
-        } else if (target.type === "subject") {
-            showItem("ctxNewNote",   true);
-            showItem("ctxNewFolder", false);
-            showItem("ctxRename",    true);
-            showItem("ctxDelete",    true);
-            showSep("ctx-sep-rename", true);
-        } else { /* note */
-            showItem("ctxNewNote",   false);
-            showItem("ctxNewFolder", false);
-            showItem("ctxRename",    true);
-            showItem("ctxDelete",    true);
-            showSep("ctx-sep-rename", true);
-        }
-
-        const x = Math.min(e.clientX, window.innerWidth  - 170);
-        const y = Math.min(e.clientY, window.innerHeight - 140);
-        ctxMenu.style.left = `${x}px`;
-        ctxMenu.style.top  = `${y}px`;
+        ctxMenu.style.left = Math.min(e.clientX, window.innerWidth  - 170) + "px";
+        ctxMenu.style.top  = Math.min(e.clientY, window.innerHeight - 140) + "px";
         ctxMenu.classList.add("show");
     }
 
@@ -634,19 +772,34 @@ const Home = (() => {
         Modal
     ================================================== */
     function buildSubjectOptions() {
-        modalFolderSelect.innerHTML = `<option value="">최상위 (폴더 없음)</option>`;
-        function recurse(parentId, depth) {
+        /* 스택 기반 순회 — 재귀 대비 콜스택 안전, 이름순 정렬 적용 */
+        const frag = document.createDocumentFragment();
+        const def  = document.createElement("option");
+        def.value = ""; def.textContent = "폴더 선택";
+        frag.appendChild(def);
+
+        const stack = subjectCache
+            .filter(s => (s.parentId ?? null) === null)
+            .sort((a, b) => a.name.localeCompare(b.name, "ko"))
+            .reverse()
+            .map(s => ({ s, depth: 0 }));
+
+        while (stack.length) {
+            const { s, depth } = stack.pop();
+            const opt = document.createElement("option");
+            opt.value       = s.id;
+            opt.textContent = "\u00a0\u00a0".repeat(depth * 2) + s.name;
+            frag.appendChild(opt);
+
             subjectCache
-                .filter(s => (s.parentId ?? null) === parentId)
-                .forEach(s => {
-                    const opt       = document.createElement("option");
-                    opt.value       = s.id;
-                    opt.textContent = "\u00a0\u00a0".repeat(depth * 2) + s.name;
-                    modalFolderSelect.appendChild(opt);
-                    recurse(s.id, depth + 1);
-                });
+                .filter(c => c.parentId === s.id)
+                .sort((a, b) => a.name.localeCompare(b.name, "ko"))
+                .reverse()
+                .forEach(c => stack.push({ s: c, depth: depth + 1 }));
         }
-        recurse(null, 0);
+
+        modalFolderSelect.innerHTML = "";
+        modalFolderSelect.appendChild(frag);
     }
 
     function openModal(title, placeholder, showSubjectSelect, action) {
@@ -708,21 +861,21 @@ const Home = (() => {
     async function serverSessionCheck() {
         try {
             const resp = await fetch('/api/v1/auth/status');
-            if (resp.message) {
-                // already authenticated
-                location.replace('/home');
+            if (resp.ok) {
+                const data = await resp.json();
+                if (!data.authenticated) location.replace('login.html');
+            } else {
+                location.replace('login.html');
             }
         } catch (e) {
-            // ignore, not logged in
+            location.replace('login.html');
         }
     }
 
     /* ==================================================
         Publish
     ================================================== */
-    return {
-        init
-    }
+    return { init }
 })();
 
 /* ==================================================
