@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kkmnote</title>
+    <meta name="description" content="kkmnote — note archive" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon/android-chrome-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon/android-chrome-512x512.png">
+    <link rel="shortcut icon" href="/favicon/favicon.ico">
+    <link rel="manifest" href="/favicon/site.webmanifest">
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/login.css" />
+</head>
+
+<body>
+
+    <div class="theme-toggle-fixed">
+        <button class="btn" id="themeBtn" type="button" title="테마 전환">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M21 12.7A8.5 8.5 0 1 1 11.3 3a7 7 0 0 0 9.7 9.7Z" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="login-card" role="main">
+
+        <div class="login-brand">
+            <div class="logo" aria-hidden="true"></div>
+            <div>
+                <h2 class="login-title">kkmnote</h2>
+                <p class="login-sub">개인 노트 저장소</p>
+            </div>
+        </div>
+
+        <form class="login-form" id="loginForm" autocomplete="off" novalidate>
+
+            <!-- ID -->
+            <div class="lf-field">
+                <label for="loginId">아이디</label>
+                <div class="lf-input-wrap">
+                    <svg class="lf-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.6"
+                            stroke-linecap="round" />
+                    </svg>
+                    <input id="loginId" type="text" placeholder="아이디를 입력하세요" autocomplete="username" />
+                </div>
+            </div>
+
+            <!-- Password -->
+            <div class="lf-field">
+                <label for="loginPw">비밀번호</label>
+                <div class="lf-input-wrap">
+                    <svg class="lf-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.6"
+                            stroke-linejoin="round" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" stroke-width="1.6"
+                            stroke-linecap="round" />
+                        <circle cx="12" cy="16" r="1.5" fill="currentColor" />
+                    </svg>
+                    <input id="loginPw" type="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" />
+                    <button class="lf-pw-toggle" id="pwToggle" type="button" aria-label="비밀번호 표시/숨기기">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" id="pwEyeIcon">
+                            <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" stroke="currentColor"
+                                stroke-width="1.6" />
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error -->
+            <div class="login-error" id="loginError" role="alert" aria-live="polite">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+                <span id="loginErrorMsg">아이디 또는 비밀번호가 올바르지 않습니다.</span>
+            </div>
+
+            <button class="login-submit" type="submit">로그인</button>
+
+        </form>
+
+        <p class="login-footer">©kwangmin-kim — kkmnote</p>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite">
+        <span class="t-dot" aria-hidden="true"></span>
+        <span id="toastText"></span>
+    </div>
+
+    <script src="/js/api/login.js"></script>
+    <script src="/js/view/login.js"></script>
+</body>
+
+</html>
