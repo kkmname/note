@@ -1,0 +1,593 @@
+/* =============================================================
+   home.css — kkmnote 홈 전용 스타일
+   풀-스크린 2-컬럼 레이아웃: 좌측 사이드바(트리) + 우측 에디터
+   base.css 이후 로드
+============================================================= */
+
+/* -------------------------------------------------------
+   Full-height Split Layout
+------------------------------------------------------- */
+html, body { overflow: hidden; height: 100%; }
+
+.layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------
+   Sidebar
+------------------------------------------------------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-right: 1px solid var(--border);
+  background:
+    radial-gradient(480px 380px at -5% 0%, rgba(124,106,245,.12), transparent 65%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+  min-height: 57px;
+}
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------
+   Tree View (사이드바 본문)
+------------------------------------------------------- */
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.08) transparent;
+}
+.sidebar-body::-webkit-scrollbar { width: 3px; }
+.sidebar-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.10); border-radius: 4px; }
+[data-theme="light"] .sidebar-body::-webkit-scrollbar-thumb { background: rgba(14,18,35,.12); }
+
+/* Tree root list */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Folder row ─── */
+.tree-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  user-select: none;
+  transition: background .14s var(--ease), color .14s var(--ease);
+}
+.tree-folder-row:hover { background: rgba(255,255,255,.06); color: var(--text); }
+[data-theme="light"] .tree-folder-row:hover { background: rgba(14,18,35,.05); }
+
+/* Chevron icon — rotates on open */
+.tree-chevron {
+  width: 13px; height: 13px;
+  flex-shrink: 0;
+  color: var(--faint);
+  transition: transform .2s var(--ease), color .15s var(--ease);
+}
+.tree-chevron.open { transform: rotate(90deg); color: var(--accent); }
+
+.folder-emoji  { font-size: 13px; line-height: 1; flex-shrink: 0; }
+.tree-folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-folder-count {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--faint);
+  background: rgba(255,255,255,.06);
+  border-radius: 999px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Folder children list ─── */
+.tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .3s var(--ease);
+  border-left: 1px solid var(--border);
+  margin-left: 11px;
+}
+.tree-children.open { max-height: 9999px; }
+/* 중첩 레벨이 깊어질수록 트리 라인 투명도 점진 */
+.tree-children .tree-children { opacity: 1; }
+[data-theme="light"] .tree-children { border-left-color: rgba(14,18,35,.12); }
+
+/* ─── Note row ─── */
+.tree-note-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+  transition: background .14s var(--ease), color .14s var(--ease);
+  position: relative;
+}
+.tree-note-row:hover { background: rgba(255,255,255,.05); color: var(--text); }
+[data-theme="light"] .tree-note-row:hover { background: rgba(14,18,35,.04); }
+
+/* Active / selected note */
+.tree-note-row.active {
+  background: rgba(124,106,245,.10);
+  color: var(--text);
+}
+.tree-note-row.active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 2.5px; height: 60%;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+}
+.tree-note-icon {
+  width: 12px; height: 12px;
+  flex-shrink: 0;
+  color: var(--faint);
+}
+.tree-note-row.active .tree-note-icon { color: var(--accent); }
+
+.tree-note-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-note-date { font-size: 10.5px; color: var(--faint); flex-shrink: 0; }
+
+/* ─── Empty tree hint ─── */
+.tree-empty {
+  padding: 20px 12px;
+  font-size: 12px;
+  color: var(--faint);
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* -------------------------------------------------------
+   Sidebar Footer
+------------------------------------------------------- */
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding: 9px 12px;
+  font-size: 11px;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+/* -------------------------------------------------------
+   Editor Panel (right side)
+------------------------------------------------------- */
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(700px 500px at 90% -5%, rgba(176,126,248,.07), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg2));
+}
+
+/* ─── Editor Topbar ─── */
+.editor-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: 57px;
+}
+
+.editor-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.editor-title.placeholder { color: var(--faint); font-weight: 400; font-size: 14px; }
+
+.editor-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Editor Body ─── */
+.editor-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Empty state */
+.editor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 14px;
+  color: var(--faint);
+  user-select: none;
+}
+.editor-empty svg {
+  width: 52px; height: 52px;
+  opacity: .20;
+}
+.editor-empty p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  text-align: center;
+}
+.editor-empty small {
+  font-size: 11.5px;
+  color: var(--faint);
+  opacity: .7;
+}
+
+/* ─── EasyMDE 컨테이너 풀 높이 채우기 ─── */
+.editor-body .EasyMDEContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* Toolbar */
+.editor-body .editor-toolbar {
+  background: var(--bg2) !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 5px 10px !important;
+  flex-shrink: 0;
+}
+[data-theme="light"] .editor-body .editor-toolbar { background: var(--bg) !important; }
+.editor-body .editor-toolbar button {
+  color: var(--muted) !important;
+  border-radius: 7px !important;
+  transition: background .13s ease, color .13s ease !important;
+}
+.editor-body .editor-toolbar button:hover,
+.editor-body .editor-toolbar button.active {
+  background: rgba(124,106,245,.12) !important;
+  color: var(--accent) !important;
+  border-color: transparent !important;
+}
+.editor-body .editor-toolbar i.separator { border-color: var(--border) !important; }
+
+/* CodeMirror (edit mode) */
+.editor-body .CodeMirror {
+  flex: 1;
+  height: 100% !important;
+  min-height: 0 !important;
+  background: var(--bg2) !important;
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-size: 14.5px !important;
+  line-height: 1.75 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+[data-theme="light"] .editor-body .CodeMirror { background: var(--bg) !important; }
+.editor-body .CodeMirror-cursor { border-left-color: var(--accent) !important; }
+.editor-body .CodeMirror-scroll { height: 100%; padding: 20px 28px; box-sizing: border-box; overflow-x: hidden !important; }
+.editor-body .CodeMirror pre.CodeMirror-line,
+.editor-body .CodeMirror pre.CodeMirror-line-like { white-space: pre-wrap !important; word-break: break-word !important; }
+
+/* Status bar */
+.editor-body .editor-statusbar {
+  color: var(--faint) !important;
+  border-top: 1px solid var(--border) !important;
+  background: var(--bg2) !important;
+  font-size: 11px !important;
+  padding: 4px 12px !important;
+  flex-shrink: 0;
+}
+[data-theme="light"] .editor-body .editor-statusbar { background: var(--bg) !important; }
+
+/* ─── Preview 패널 ─── */
+.editor-body .editor-preview {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-size: 15px !important;
+  line-height: 1.78 !important;
+  padding: 28px 36px !important;
+  border: none !important;
+  box-sizing: border-box !important;
+  overflow-y: auto;
+  z-index: 5 !important;
+}
+[data-theme="light"] .editor-body .editor-preview { background: var(--bg) !important; }
+
+/* Side-by-side */
+.editor-body .editor-preview-side {
+  background: var(--bg2) !important;
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-size: 14px !important;
+  line-height: 1.78 !important;
+  padding: 22px 26px !important;
+  border-left: 1px solid var(--border) !important;
+  box-sizing: border-box !important;
+  z-index: 5 !important;
+}
+[data-theme="light"] .editor-body .editor-preview-side { background: var(--bg) !important; }
+
+/* ─── Preview 내 Markdown 스타일 ─── */
+.editor-body .editor-preview h1,
+.editor-body .editor-preview h2,
+.editor-body .editor-preview h3,
+.editor-body .editor-preview h4,
+.editor-body .editor-preview-side h1,
+.editor-body .editor-preview-side h2,
+.editor-body .editor-preview-side h3,
+.editor-body .editor-preview-side h4 {
+  color: var(--text) !important;
+  font-weight: 700 !important;
+  letter-spacing: -.3px !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding-bottom: .3em !important;
+  margin: 1.6em 0 .6em !important;
+}
+.editor-body .editor-preview p,
+.editor-body .editor-preview li,
+.editor-body .editor-preview-side p,
+.editor-body .editor-preview-side li { color: var(--muted) !important; }
+
+.editor-body .editor-preview a,
+.editor-body .editor-preview-side a { color: var(--accent) !important; text-decoration: underline !important; }
+
+.editor-body .editor-preview code,
+.editor-body .editor-preview-side code {
+  font-family: var(--mono) !important;
+  font-size: .87em !important;
+  background: rgba(124,106,245,.10) !important;
+  color: var(--accent) !important;
+  border-radius: 5px !important;
+  padding: 2px 6px !important;
+}
+.editor-body .editor-preview pre,
+.editor-body .editor-preview-side pre {
+  background: rgba(0,0,0,.28) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  padding: 16px 18px !important;
+  overflow-x: auto !important;
+}
+[data-theme="light"] .editor-body .editor-preview pre,
+[data-theme="light"] .editor-body .editor-preview-side pre { background: rgba(14,18,35,.06) !important; }
+.editor-body .editor-preview pre code,
+.editor-body .editor-preview-side pre code { background: none !important; padding: 0 !important; }
+
+.editor-body .editor-preview blockquote,
+.editor-body .editor-preview-side blockquote {
+  border-left: 3px solid var(--accent) !important;
+  margin: 1em 0 !important;
+  padding: .5em 1em !important;
+  color: var(--muted) !important;
+  font-style: italic !important;
+}
+.editor-body .editor-preview table,
+.editor-body .editor-preview-side table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+.editor-body .editor-preview th,
+.editor-body .editor-preview td,
+.editor-body .editor-preview-side th,
+.editor-body .editor-preview-side td {
+  border: 1px solid var(--border) !important;
+  padding: .5em .8em !important;
+}
+.editor-body .editor-preview th,
+.editor-body .editor-preview-side th {
+  background: rgba(124,106,245,.08) !important;
+  font-weight: 600 !important;
+}
+.editor-body .editor-preview hr,
+.editor-body .editor-preview-side hr {
+  border: none !important;
+  border-top: 1px solid var(--border) !important;
+  margin: 2em 0 !important;
+}
+
+/* ─── Fullscreen overrides ─── */
+.editor-toolbar.fullscreen {
+  z-index: 2000 !important;
+  position: fixed !important;
+  top: 0 !important; left: 0 !important; right: 0 !important;
+  background: var(--bg2) !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+}
+.CodeMirror-fullscreen {
+  z-index: 1990 !important;
+  position: fixed !important;
+  top: 50px !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+  height: auto !important;
+  background: var(--bg) !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+.editor-preview-active-side.CodeMirror-fullscreen { width: 50% !important; }
+.editor-preview-side.editor-preview-active-side {
+  position: fixed !important;
+  z-index: 1990 !important;
+  top: 50px !important; right: 0 !important; bottom: 0 !important;
+  width: 50% !important; height: auto !important;
+  background: var(--bg) !important;
+  overflow-y: auto !important;
+}
+/* side-by-side 컨테이너 배경 */
+.editor-body .EasyMDEContainer.editor-preview-active-side {
+  background: var(--bg2) !important;
+}
+[data-theme="light"] .editor-body .EasyMDEContainer.editor-preview-active-side {
+  background: var(--bg) !important;
+}
+
+/* -------------------------------------------------------
+   Context Menu
+------------------------------------------------------- */
+.ctx-menu {
+  position: fixed;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 5px;
+  z-index: 800;
+  min-width: 158px;
+  opacity: 0;
+  transform: scale(.95) translateY(-4px);
+  pointer-events: none;
+  transition: opacity .16s var(--ease), transform .16s var(--ease);
+}
+[data-theme="light"] .ctx-menu { background: #fff; border-color: rgba(14,18,35,.12); }
+.ctx-menu.show { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background .12s ease;
+  user-select: none;
+}
+.ctx-item:hover { background: rgba(255,255,255,.07); }
+[data-theme="light"] .ctx-item:hover { background: rgba(14,18,35,.06); }
+.ctx-item svg { width: 13px; height: 13px; color: var(--muted); flex-shrink: 0; }
+.ctx-item.danger { color: #ff4757; }
+.ctx-item.danger svg { color: #ff4757; }
+.ctx-item.danger:hover { background: rgba(255,71,87,.08); }
+
+.ctx-separator { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* -------------------------------------------------------
+   Drag & Drop visual states
+------------------------------------------------------- */
+
+/* 드래그 중인 아이템 반투명 */
+.tree-note-row.dnd-dragging   { opacity: .35; pointer-events: none; }
+.tree-folder-item.dnd-dragging { opacity: .35; }
+
+/* 드롭 타겟: 폴더 행 */
+.tree-folder-row.dnd-over {
+  background: rgba(124,106,245,.14) !important;
+  outline: 1.5px dashed rgba(124,106,245,.55);
+  outline-offset: -1px;
+  border-radius: 9px;
+}
+
+/* 드롭 타겟: 루트 영역 */
+.sidebar-body.dnd-root-over {
+  background: rgba(124,106,245,.04);
+  outline: 1.5px dashed rgba(124,106,245,.30);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+
+/* -------------------------------------------------------
+   Mobile Layout ≤ 768px
+------------------------------------------------------- */
+
+/* 백버튼: 데스크톱에서는 감춤 */
+.mob-back-btn { display: none !important; }
+
+@media (max-width: 768px) {
+  /* 레이아웃: 1컨럼으로 */
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  /* 사이드바: 진체 너비 100% */
+  .sidebar {
+    width: 100%;
+    border-right: none;
+  }
+
+  /* 에디터 패널: 모바일에서 기본 숨김 — active 시만 표시 */
+  .editor-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+  }
+  .editor-panel.mobile-active {
+    display: flex;
+  }
+
+  /* 사이드바 숨김 (에디터 활성화 시) */
+  .sidebar.mobile-hidden {
+    display: none;
+  }
+
+  /* 모바일 백 버튼 표시 */
+  .mob-back-btn { display: inline-flex !important; }
+
+  /* 에디터 톱바 타이틀 여백 조정 */
+  .editor-topbar {
+    padding: 10px 14px;
+  }
+
+  /* 노트 제목 트리에서 날짜 숨김 (좌측 너비 절약) */
+  .tree-note-date { display: none; }
+
+  /* 폴더 행: 더 큰 터치 타겟 */
+  .tree-folder-row {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 11px;
+  }
+  .tree-chevron { width: 16px; height: 16px; }
+  .folder-emoji  { font-size: 16px; }
+  .tree-folder-count { font-size: 12px; padding: 1px 7px; }
+}

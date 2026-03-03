@@ -1,6 +1,8 @@
 /* =============================================================
-   base.css — kkmblog 공유 디자인 토큰 & 공통 컴포넌트
-   home.css, article.css 양쪽에서 import하여 사용
+   base.css — kkmnote 공유 디자인 토큰 & 공통 컴포넌트
+   kkmblog/base.css 디자인 시스템 승계
+   강조색(accent)만 Obsidian Purple로 변경하여 프로젝트 구분
+   ※ home(노트 에디터), login 양쪽에서 공유
 ============================================================= */
 
 /* -------------------------------------------------------
@@ -14,8 +16,10 @@
   --muted:  #a7afc3;
   --faint:  #6d7690;
   --border: rgba(255, 255, 255, .08);
-  --accent: #7c5cff;
-  --accent2:#32d3ff;
+
+  /* Note 강조색: Obsidian-style Purple/Violet */
+  --accent:  #7c6af5;
+  --accent2: #b07ef8;
 
   /* Shadows */
   --shadow:  0 18px 60px rgba(0, 0, 0, .55);
@@ -33,6 +37,9 @@
 
   /* Motion */
   --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* Layout — home.css의 .layout grid에서 참조 */
+  --sidebar-w: 300px;
 }
 
 /* Light mode overrides */
@@ -45,85 +52,61 @@
   --border: rgba(14, 18, 35, .10);
   --shadow: 0 18px 50px rgba(14, 18, 35, .14);
   --shadow2:0 10px 25px rgba(14, 18, 35, .10);
-  --accent: #6a5cff;
-  --accent2:#0aa7ff;
+  --accent:  #6c5ce7;
+  --accent2: #9b59d6;
 }
 
 /* -------------------------------------------------------
    2. Reset & Base
+   ※ height: 100% 필수 — home.css의 100vh 레이아웃 기준점
 ------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
-html, body { min-height: 100%; }
+html, body { margin: 0; padding: 0; height: 100%; }
 
 html {
-  scrollbar-gutter: stable; /* 스크롤바 공간 항상 예약 — 페이지 이동 시 topbar 이동 방지 */
+  scrollbar-gutter: stable;
   background:
-    radial-gradient(1200px 700px at 15% -10%, rgba(124, 92, 255, .30), transparent 60%),
-    radial-gradient(1000px 600px at 80%    0%, rgba(50, 211, 255, .18), transparent 55%),
+    radial-gradient(1200px 700px at 15% -10%, rgba(124, 106, 245, .22), transparent 60%),
+    radial-gradient(1000px 600px at 85%    0%, rgba(176, 126, 248, .14), transparent 55%),
     linear-gradient(180deg, var(--bg), var(--bg2));
   background-color: var(--bg);
 }
 
 body {
-  margin: 0;
   font-family: var(--font);
   color: var(--text);
   background: transparent;
-  min-height: 100vh;
-  overflow-x: hidden;
+  min-height: 100%;
 }
 
 a { color: inherit; text-decoration: none; }
-::selection { background: rgba(124, 92, 255, .35); }
+::selection { background: rgba(124, 106, 245, .30); }
 
 /* -------------------------------------------------------
-   3. Layout
+   3. Brand / Logo
 ------------------------------------------------------- */
-.wrap {
-  margin: 0 auto;
-  padding: 28px 18px 80px;
-}
-
-/* -------------------------------------------------------
-   4. Topbar
-------------------------------------------------------- */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 40px;
-}
-
-/* Topbar right-side button group */
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Brand / Logo */
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   user-select: none;
-  text-decoration: none;
   color: inherit;
+  text-decoration: none;
 }
 
 .logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
   background:
-    radial-gradient(16px 16px at 30% 30%, rgba(255,255,255,.9), rgba(255,255,255,.15) 55%, transparent 70%),
-    linear-gradient(135deg, rgba(80,52,210,.95), rgba(124,92,255,.90));
-  box-shadow: 0 12px 30px rgba(124, 92, 255, .28);
+    radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,.9), rgba(255,255,255,.15) 55%, transparent 70%),
+    linear-gradient(135deg, rgba(80,58,210,.95), rgba(124,106,245,.90));
+  box-shadow: 0 10px 26px rgba(124, 106, 245, .32);
   position: relative;
   overflow: hidden;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 .logo::before {
   content: "kkm";
@@ -132,10 +115,10 @@ a { color: inherit; text-decoration: none; }
   color: rgba(255, 255, 255, .92);
   font-family: var(--mono);
   font-weight: 800;
-  font-size: 12px;
-  letter-spacing: .6px;
+  font-size: 11px;
+  letter-spacing: .5px;
   text-transform: uppercase;
-  text-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+  text-shadow: 0 8px 20px rgba(0, 0, 0, .30);
 }
 .logo::after {
   content: "";
@@ -154,65 +137,55 @@ a { color: inherit; text-decoration: none; }
 
 .brand h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: .2px;
   line-height: 1.2;
 }
 .brand p {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 1px 0 0;
+  font-size: 11px;
   color: var(--muted);
 }
 
 /* -------------------------------------------------------
-   5. Button
+   4. Button
 ------------------------------------------------------- */
 .btn {
   border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
   color: var(--text);
-  padding: 10px 12px;
-  border-radius: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
   box-shadow: var(--shadow2);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition: transform .18s var(--ease), border-color .18s var(--ease);
+  gap: 7px;
+  transition: transform .18s var(--ease), border-color .18s var(--ease), opacity .18s var(--ease);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  font-size: 13px;
-  font-family: var(--font);
-}
-.btn:hover  { transform: translateY(-1px); border-color: rgba(124,92,255,.35); }
-.btn:active { transform: translateY(0) scale(.99); }
-.btn svg    { width: 16px; height: 16px; opacity: .85; }
-
-/* -------------------------------------------------------
-   6. Footer
-------------------------------------------------------- */
-footer {
-  margin-top: 18px;
-  padding: 14px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-  box-shadow: var(--shadow2);
-  color: var(--faint);
   font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  font-family: var(--font);
+  white-space: nowrap;
 }
-[data-theme="light"] footer {
-  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.80));
+.btn:hover  { transform: translateY(-1px); border-color: rgba(124,106,245,.38); }
+.btn:active { transform: translateY(0) scale(.99); }
+.btn svg    { width: 15px; height: 15px; opacity: .85; flex-shrink: 0; }
+
+/* Primary / accent button — home.css의 신규 노트 버튼 등에서 사용 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(124, 106, 245, .28);
 }
+.btn-primary:hover  { border-color: transparent; opacity: .88; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0) scale(.99); }
+.btn-primary svg    { opacity: 1; }
 
 /* -------------------------------------------------------
-   7. Toast
+   5. Toast
 ------------------------------------------------------- */
 .toast {
   position: fixed;
@@ -234,8 +207,8 @@ footer {
   display: flex;
   gap: 10px;
   align-items: center;
-  max-width: min(540px, calc(100vw - 24px));
-  z-index: 999;
+  max-width: min(480px, calc(100vw - 24px));
+  z-index: 9999;
 }
 [data-theme="light"] .toast {
   background: rgba(255, 255, 255, .88);
@@ -251,12 +224,14 @@ footer {
 }
 
 /* -------------------------------------------------------
-   8. Subscribe Modal
+   6. Modal backdrop & card
+   ※ home.html의 노트/폴더 생성·이름변경 모달
+   ※ login.html의 인증 모달 양쪽에서 공유
 ------------------------------------------------------- */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .55);
+  background: rgba(0, 0, 0, .50);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
@@ -268,7 +243,7 @@ footer {
   pointer-events: none;
   transition: opacity .22s var(--ease);
 }
-[data-theme="light"] .modal-backdrop { background: rgba(14, 18, 35, .40); }
+[data-theme="light"] .modal-backdrop { background: rgba(14, 18, 35, .38); }
 .modal-backdrop.show { opacity: 1; pointer-events: auto; }
 
 .modal {
@@ -276,22 +251,19 @@ footer {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 4px);
   box-shadow: var(--shadow);
-  padding: 32px 28px 28px;
+  padding: 28px 24px 24px;
   width: 100%;
-  max-width: 400px;
+  max-width: 380px;
   position: relative;
-  transform: translateY(16px) scale(.97);
-  transition: transform .25s var(--ease);
+  transform: translateY(14px) scale(.97);
+  transition: transform .24s var(--ease);
 }
-[data-theme="light"] .modal {
-  background: linear-gradient(160deg, var(--bg), var(--bg2));
-}
+[data-theme="light"] .modal { background: linear-gradient(160deg, var(--bg), var(--bg2)); }
 .modal-backdrop.show .modal { transform: translateY(0) scale(1); }
 
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 12px; right: 12px;
   background: none;
   border: none;
   color: var(--muted);
@@ -299,36 +271,19 @@ footer {
   padding: 6px;
   border-radius: 8px;
   display: flex;
-  transition: color .15s var(--ease), background .15s var(--ease);
+  transition: color .14s var(--ease), background .14s var(--ease);
 }
 .modal-close:hover { color: var(--text); background: rgba(255,255,255,.08); }
-.modal-close svg { width: 18px; height: 18px; }
+.modal-close svg { width: 16px; height: 16px; }
 
-.modal-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(124,92,255,.18), rgba(50,211,255,.12));
-  border: 1px solid rgba(124,92,255,.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-.modal-icon svg { width: 22px; height: 22px; color: var(--accent); }
-
-.modal-title {
-  margin: 0 0 6px;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -.3px;
-}
-.modal-desc {
+/* 모달 제목 — home.html은 h3 태그 사용 */
+.modal h3 {
   margin: 0 0 20px;
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.6;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -.2px;
 }
+
 .modal-field {
   display: flex;
   flex-direction: column;
@@ -340,8 +295,9 @@ footer {
   font-weight: 500;
   color: var(--muted);
 }
-.modal-field input {
-  background: rgba(0, 0, 0, .18);
+.modal-field input,
+.modal-select {
+  background: rgba(0,0,0,.18);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
@@ -351,31 +307,53 @@ footer {
   outline: none;
   transition: border-color .18s var(--ease);
   width: 100%;
-  box-sizing: border-box;
 }
-[data-theme="light"] .modal-field input { background: rgba(255,255,255,.80); }
-.modal-field input:focus { border-color: rgba(124,92,255,.55); }
+[data-theme="light"] .modal-field input,
+[data-theme="light"] .modal-select { background: rgba(255,255,255,.80); }
+.modal-field input:focus,
+.modal-select:focus { border-color: rgba(124,106,245,.55); }
 .modal-field input::placeholder { color: var(--faint); }
+.modal-select { appearance: auto; cursor: pointer; }
 
+/* 버튼 행 — home.html 취소/확인 버튼 */
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
 .modal-submit {
-  width: 100%;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   border: none;
   color: #fff;
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 11px 20px;
-  border-radius: 12px;
+  padding: 9px 18px;
+  border-radius: 10px;
   cursor: pointer;
   transition: opacity .18s var(--ease), transform .18s var(--ease);
-  box-shadow: 0 8px 22px rgba(124,92,255,.28);
+  box-shadow: 0 6px 18px rgba(124, 106, 245, .26);
 }
-.modal-submit:hover { opacity: .88; transform: translateY(-1px); }
+.modal-submit:hover  { opacity: .88; transform: translateY(-1px); }
 .modal-submit:active { transform: translateY(0) scale(.98); }
 
+.modal-cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .18s var(--ease), color .18s var(--ease);
+}
+.modal-cancel:hover { border-color: rgba(255,255,255,.18); color: var(--text); }
+
 /* -------------------------------------------------------
-   8. Accessibility / Motion
+   7. Accessibility / Motion
 ------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
