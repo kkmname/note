@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "[Local]NoteApplication",
+            "request": "launch",
+            "mainClass": "com.kkmserver.note.NoteApplication",
+            "projectName": "note",
+            "args": "--spring.profiles.active=local"
+        }
+    ]
+}
