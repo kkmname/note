@@ -325,6 +325,7 @@ html, body { overflow: hidden; height: 100%; }
 .editor-body .CodeMirror-scroll { height: 100%; padding: 20px 28px; box-sizing: border-box; overflow-x: hidden !important; }
 .editor-body .CodeMirror pre.CodeMirror-line,
 .editor-body .CodeMirror pre.CodeMirror-line-like { white-space: pre-wrap !important; word-break: break-word !important; }
+.editor-body .CodeMirror img { max-width: 100% !important; height: auto !important; }
 
 /* Status bar */
 .editor-body .editor-statusbar {
@@ -434,6 +435,14 @@ html, body { overflow: hidden; height: 100%; }
   background: rgba(124,106,245,.08) !important;
   font-weight: 600 !important;
 }
+.editor-body .editor-preview img,
+.editor-body .editor-preview-side img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  border-radius: 8px !important;
+}
+
 .editor-body .editor-preview hr,
 .editor-body .editor-preview-side hr {
   border: none !important;

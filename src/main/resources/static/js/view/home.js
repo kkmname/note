@@ -554,7 +554,7 @@ const Home = (() => {
                     "link",
                     {
                         name:      "image",
-                        action:    uploadImageAsBase64,
+                        action:    uploadImage,
                         className: "fa fa-image",
                         title:     "이미지 업로드",
                     },
@@ -578,24 +578,30 @@ const Home = (() => {
         }, 60);
     }
 
-    function uploadImageAsBase64(editor) {
+    async function uploadImage(editor) {
+        if (!currentNote) {
+            toast("노트를 먼저 선택해주세요.");
+            return;
+        }
         const input  = document.createElement("input");
         input.type   = "file";
         input.accept = "image/*";
-        input.onchange = function () {
+        input.onchange = async function () {
             const file = this.files[0];
             if (!file) return;
-            toast("이미지 읽는 중\u2026");
-            const reader = new FileReader();
-            reader.onload = (ev) => {
+            toast("이미지 업로드 중\u2026");
+            try {
+                const imageResponse = await Image_API.uploadImage(file, currentNote.id);
                 const cm  = editor.codemirror;
                 const alt = file.name.replace(/\.[^.]+$/, "");
-                cm.replaceSelection("![" + alt + "](" + ev.target.result + ")");
+                const imageUrl = `/api/v1/image/${imageResponse.id}`;
+                cm.replaceSelection(`![${alt}](${imageUrl})`);
                 cm.focus();
                 toast("이미지 삽입됨 \u2713");
-            };
-            reader.onerror = () => toast("이미지 읽기 실패");
-            reader.readAsDataURL(file);
+            } catch (error) {
+                console.error("Image upload failed:", error);
+                toast("이미지 업로드에 실패했습니다.");
+            }
         };
         input.click();
     }
