@@ -11,6 +11,7 @@ public class SubjectResponse {
     private Integer sortOrder;
     private LocalDate createdAt;
     private LocalDate modifiedAt;
+    private int articleCount;
 
     public static SubjectResponse fromEntity(Subject s) {
         if (s == null) return null;
@@ -70,5 +71,13 @@ public class SubjectResponse {
 
     public void setModifiedAt(LocalDate modifiedAt) {
         this.modifiedAt = modifiedAt;
+    }
+
+    public int getArticleCount() {
+        return articleCount;
+    }
+
+    public void setArticleCount(int articleCount) {
+        this.articleCount = articleCount;
     }
 }

@@ -208,8 +208,16 @@
                 <input id="modalInput" type="text" placeholder="이름을 입력하세요" autocomplete="off" />
             </div>
             <div class="modal-field" id="modalFolderField" style="display:none;">
-                <label for="modalFolderSelect">폴더 선택</label>
-                <select id="modalFolderSelect" class="modal-select"></select>
+                <label>폴더 선택</label>
+                <div class="mcs" id="modalFolderSelect" role="combobox" tabindex="0">
+                    <div class="mcs-trigger">
+                        <span class="mcs-display">폴더 선택</span>
+                        <svg class="mcs-chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <ul class="mcs-list" role="listbox"></ul>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="modal-cancel" id="modalCancel" type="button">취소</button>

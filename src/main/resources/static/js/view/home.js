@@ -26,6 +26,7 @@ const Home = (() => {
     let toastTimer   = null;
     let subjectCache = [];
     let dnd          = null; /* [FIX-2] { type, noteId?, subjectId?, fromSubjectId?, el } */
+    let _mcsVal      = "";   /* 커스텀 폴더 셀렉트 현재 선택값 */
 
     const LS_THEME = "journal:theme";
     const SS_AUTH  = "note:auth";
@@ -82,7 +83,7 @@ const Home = (() => {
         newNoteBtn.addEventListener("click", () => {
             if (subjectCache.length === 0) { toast("먼저 폴더를 만들어주세요."); return; }
             openModal("새 노트", "노트 제목", true, (name) => {
-                const subjectId = modalFolderSelect.value ? Number(modalFolderSelect.value) : null;
+                const subjectId = _mcsVal ? Number(_mcsVal) : null;
                 if (!subjectId) { toast("폴더를 선택해주세요."); return; }
                 createNote(name, subjectId);
             });
@@ -127,6 +128,7 @@ const Home = (() => {
 
         document.addEventListener("mousedown", (e) => {
             if (ctxMenu.classList.contains("show") && !e.target.closest("#ctxMenu")) closeCtxMenu();
+            if (!e.target.closest("#modalFolderSelect")) closeMcs();
         });
 
         sidebarBody.addEventListener("contextmenu", (e) => {
@@ -182,6 +184,12 @@ const Home = (() => {
             endDnd();
         });
 
+        /* MCS 커스텀 셀렉트 트리거 */
+        modalFolderSelect.querySelector(".mcs-trigger").addEventListener("click", (e) => {
+            e.stopPropagation();
+            modalFolderSelect.classList.toggle("open");
+        });
+
         window.addEventListener("resize", () => {
             if (window.innerWidth > 768) {
                 sidebarEl.classList.remove("mobile-hidden");
@@ -210,6 +218,13 @@ const Home = (() => {
         Render Tree
     ================================================== */
     async function renderTree() {
+        /* 현재 열린 폴더 id 목록 저장 — 재렌더 후 복원에 사용 */
+        const openIds = new Set(
+            [...document.querySelectorAll(".tree-children.open")]
+                .map(el => el.dataset.subjectId)
+                .filter(Boolean)
+        );
+
         try {
             subjectCache = await Subject_API.getSubjects();
         } catch (e) {
@@ -235,6 +250,25 @@ const Home = (() => {
 
         noteCount.textContent = subjectCache.length + "개의 폴더";
 
+        /* 이전에 열려 있던 폴더들을 애니메이션 없이 복원 */
+        const restorePromises = [...openIds].map(id => {
+            const li = treeEl.querySelector('.tree-folder-item[data-subject-id="' + id + '"]');
+            if (!li) return Promise.resolve();
+            const ch      = li.querySelector(".tree-children");
+            const chevron = li.querySelector(".tree-chevron");
+            const emoji   = li.querySelector(".folder-emoji");
+            if (!ch) return Promise.resolve();
+            ch.classList.add("open");
+            chevron.classList.add("open");
+            emoji.textContent = "\u{1F4C2}";
+            return loadNotesIntoFolder(id, ch).then(articleCount => {
+                const badge    = li.querySelector(":scope > .tree-folder-row .tree-folder-count");
+                const subCount = subjectCache.filter(s => s.parentId === Number(id)).length;
+                if (badge) badge.textContent = subCount + articleCount;
+            });
+        });
+        await Promise.all(restorePromises);
+
         if (currentNote) highlightNote(currentNote.id);
     }
 
@@ -257,7 +291,11 @@ const Home = (() => {
             '</svg>' +
             '<span class="folder-emoji" aria-hidden="true">\u{1F4C1}</span>' +
             '<span class="tree-folder-name">' + escHtml(subject.name) + '</span>' +
-            '<span class="tree-folder-count">' + children.length + '</span>';
+            '<span class="tree-folder-count">' + (children.length + (subject.articleCount ?? 0)) + '</span>';
+
+        /* 폴더명 툴팁 */
+        const folderNameEl = row.querySelector(".tree-folder-name");
+        if (folderNameEl) attachTooltip(folderNameEl, () => subject.name);
 
         row.addEventListener("click", () => toggleSubjectFolder(li, subject.id));
         row.addEventListener("contextmenu", (e) => {
@@ -369,6 +407,10 @@ const Home = (() => {
             '</svg>' +
             '<span class="tree-note-name">' + escHtml(article.title || "제목 없음") + '</span>' +
             '<span class="tree-note-date">' + shortDate(article.modifiedAt || article.createdAt) + '</span>';
+
+        /* 노트명 툴팁 */
+        const noteNameEl = li.querySelector(".tree-note-name");
+        if (noteNameEl) attachTooltip(noteNameEl, () => article.title || "제목 없음");
 
         li.addEventListener("click", () => openNote(article.id));
         li.addEventListener("contextmenu", (e) => {
@@ -695,7 +737,10 @@ const Home = (() => {
             if (!ch.classList.contains("open")) {
                 await toggleSubjectFolder(li, subjectId);
             } else {
-                await loadNotesIntoFolder(subjectId, ch);
+                const articleCount = await loadNotesIntoFolder(subjectId, ch);
+                const badge    = li.querySelector(":scope > .tree-folder-row .tree-folder-count");
+                const subCount = subjectCache.filter(s => s.parentId === Number(subjectId)).length;
+                if (badge) badge.textContent = subCount + articleCount;
             }
         }
         await openNote(article.id);
@@ -805,12 +850,24 @@ const Home = (() => {
         Modal
     ================================================== */
     function buildSubjectOptions() {
-        /* 스택 기반 순회 — 재귀 대비 콜스택 안전, 이름순 정렬 적용 */
-        const frag = document.createDocumentFragment();
-        const def  = document.createElement("option");
-        def.value = ""; def.textContent = "폴더 선택";
-        frag.appendChild(def);
+        _mcsVal = "";
+        const list    = modalFolderSelect.querySelector(".mcs-list");
+        const display = modalFolderSelect.querySelector(".mcs-display");
+        if (!list || !display) return;
 
+        list.innerHTML = "";
+        display.textContent = "폴더 선택";
+        display.classList.remove("has-value");
+
+        /* 기본 "폴더 선택" 항목 */
+        const defLi = document.createElement("li");
+        defLi.className     = "mcs-option";
+        defLi.dataset.value = "";
+        defLi.textContent   = "폴더 선택";
+        defLi.addEventListener("click", () => selectMcsOption("", "폴더 선택", defLi));
+        list.appendChild(defLi);
+
+        /* 스택 기반 순회 — 재귀 대비 콜스택 안전, 이름순 정렬 적용 */
         const stack = subjectCache
             .filter(s => (s.parentId ?? null) === null)
             .sort((a, b) => a.name.localeCompare(b.name, "ko"))
@@ -819,10 +876,12 @@ const Home = (() => {
 
         while (stack.length) {
             const { s, depth } = stack.pop();
-            const opt = document.createElement("option");
-            opt.value       = s.id;
-            opt.textContent = "\u00a0\u00a0".repeat(depth * 2) + s.name;
-            frag.appendChild(opt);
+            const li = document.createElement("li");
+            li.className     = "mcs-option";
+            li.dataset.value = String(s.id);
+            li.textContent   = "\u00a0\u00a0".repeat(depth * 2) + s.name;
+            li.addEventListener("click", () => selectMcsOption(String(s.id), s.name, li));
+            list.appendChild(li);
 
             subjectCache
                 .filter(c => c.parentId === s.id)
@@ -830,9 +889,23 @@ const Home = (() => {
                 .reverse()
                 .forEach(c => stack.push({ s: c, depth: depth + 1 }));
         }
+    }
 
-        modalFolderSelect.innerHTML = "";
-        modalFolderSelect.appendChild(frag);
+    function selectMcsOption(value, label, optEl) {
+        _mcsVal = value;
+        const display = modalFolderSelect.querySelector(".mcs-display");
+        if (display) {
+            display.textContent = label;
+            display.classList.toggle("has-value", value !== "");
+        }
+        modalFolderSelect.querySelectorAll(".mcs-option").forEach(el =>
+            el.classList.toggle("selected", el === optEl)
+        );
+        closeMcs();
+    }
+
+    function closeMcs() {
+        modalFolderSelect.classList.remove("open");
     }
 
     function openModal(title, placeholder, showSubjectSelect, action) {
@@ -851,6 +924,7 @@ const Home = (() => {
     function closeModal() {
         modalBackdrop.classList.remove("show");
         modalAction = null;
+        closeMcs();
     }
 
     function submitModal() {
@@ -875,6 +949,66 @@ const Home = (() => {
         if (!isMobile()) return;
         editorPanel.classList.remove("mobile-active");
         sidebarEl.classList.remove("mobile-hidden");
+    }
+
+    /* ==================================================
+        Tree Tooltip
+    ================================================== */
+    const _ttEl = (() => {
+        const el = document.createElement("div");
+        el.id = "treeTooltip";
+        document.body.appendChild(el);
+        return el;
+    })();
+    let _ttTimer = null;
+
+    function showTooltip(text, anchorEl) {
+        clearTimeout(_ttTimer);
+        _ttEl.textContent = text;
+        _ttEl.classList.remove("show");
+
+        /* anchorEl 기준으로 위치 계산 */
+        const rect = anchorEl.getBoundingClientRect();
+        const gap  = 8;
+        let top  = rect.bottom + gap;
+        let left = rect.left;
+
+        /* 화면 오른쪽 넘침 방지 */
+        const ttW = 260;
+        if (left + ttW > window.innerWidth - 8) left = window.innerWidth - ttW - 8;
+        if (left < 8) left = 8;
+
+        /* 화면 아래 넘침 방지 — 위쪽으로 */
+        _ttEl.style.top  = (top) + "px";
+        _ttEl.style.left = left + "px";
+
+        /* rAF 2번 후 .show 부착 — 위치가 적용된 뒤 트랜지션 시작 */
+        requestAnimationFrame(() => requestAnimationFrame(() => _ttEl.classList.add("show")));
+    }
+
+    function hideTooltip() {
+        clearTimeout(_ttTimer);
+        _ttEl.classList.remove("show");
+    }
+
+    function attachTooltip(el, getText) {
+        let enterTimer = null;
+        el.addEventListener("mouseenter", () => {
+            enterTimer = setTimeout(() => {
+                const text = getText();
+                /* 텍스트가 실제로 잘려 있을 때만 표시 */
+                if (!text || el.scrollWidth <= el.clientWidth + 1) return;
+                showTooltip(text, el);
+            }, 400);
+        });
+        el.addEventListener("mouseleave", () => {
+            clearTimeout(enterTimer);
+            hideTooltip();
+        });
+        el.addEventListener("mousedown", () => {
+            clearTimeout(enterTimer);
+            hideTooltip();
+        });
     }
 
     /* ==================================================

@@ -557,6 +557,44 @@ html, body { overflow: hidden; height: 100%; }
 /* 백버튼: 데스크톱에서는 감춤 */
 .mob-back-btn { display: none !important; }
 
+/* -------------------------------------------------------
+   Custom Tooltip
+------------------------------------------------------- */
+#treeTooltip {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  max-width: 260px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(18, 20, 32, .92);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid rgba(124, 106, 245, .22);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .45), 0 0 0 .5px rgba(124,106,245,.12);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.5;
+  letter-spacing: .01em;
+  word-break: break-all;
+  white-space: pre-wrap;
+  opacity: 0;
+  transform: translateY(4px) scale(.97);
+  transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+#treeTooltip.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+[data-theme="light"] #treeTooltip {
+  background: rgba(255, 255, 255, .93);
+  border-color: rgba(108, 92, 231, .22);
+  box-shadow: 0 8px 28px rgba(14, 18, 35, .18), 0 0 0 .5px rgba(108,92,231,.14);
+  color: var(--text);
+}
+
 @media (max-width: 768px) {
   /* 레이아웃: 1컨럼으로 */
   .layout {

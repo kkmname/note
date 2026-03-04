@@ -257,6 +257,7 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   transform: translateY(14px) scale(.97);
   transition: transform .24s var(--ease);
+  isolation: isolate;
 }
 [data-theme="light"] .modal { background: linear-gradient(160deg, var(--bg), var(--bg2)); }
 .modal-backdrop.show .modal { transform: translateY(0) scale(1); }
@@ -307,9 +308,15 @@ a { color: inherit; text-decoration: none; }
   outline: none;
   transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
   width: 100%;
+  color-scheme: dark;
 }
 [data-theme="light"] .modal-field input,
-[data-theme="light"] .modal-select { background: rgba(255,255,255,.80); }
+[data-theme="light"] .modal-select {
+  background: #ffffff;
+  color: #121427;
+  border-color: rgba(14,18,35,.14);
+  color-scheme: light;
+}
 .modal-field input:focus,
 .modal-select:focus {
   border-color: rgba(124,106,245,.60);
@@ -333,13 +340,110 @@ a { color: inherit; text-decoration: none; }
 }
 .modal-select option {
   background: #1a1d27;
-  color: var(--text);
+  color: #e9ecf5;
   font-size: 13px;
   padding: 6px 10px;
 }
 [data-theme="light"] .modal-select option {
-  background: #f0f2f8;
+  background: #ffffff;
   color: #121427;
+}
+
+/* ── Custom Modal Select (MCS)
+   네이티브 <select>의 backdrop-filter 렌더링 충돌 완전 회피 ── */
+.mcs {
+  position: relative;
+  user-select: none;
+}
+.mcs-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(0,0,0,.18);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 10px 13px;
+  cursor: pointer;
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+[data-theme="light"] .mcs-trigger {
+  background: #ffffff;
+  border-color: rgba(14,18,35,.14);
+  color: #121427;
+}
+.mcs-trigger:hover { border-color: rgba(124,106,245,.45); }
+.mcs.open .mcs-trigger {
+  border-color: rgba(124,106,245,.60);
+  box-shadow: 0 0 0 3px rgba(124,106,245,.12);
+}
+.mcs-display {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+  transition: color .15s var(--ease);
+}
+.mcs-display.has-value { color: var(--text); }
+[data-theme="light"] .mcs-display.has-value { color: #121427; }
+.mcs-chevron {
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  color: var(--faint);
+  transition: transform .2s var(--ease), color .2s var(--ease);
+}
+.mcs.open .mcs-chevron { transform: rotate(180deg); color: var(--accent); }
+.mcs-list {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0; right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  list-style: none;
+  margin: 0; padding: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.10) transparent;
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  pointer-events: none;
+  transition: opacity .16s var(--ease), transform .16s var(--ease);
+}
+.mcs-list::-webkit-scrollbar { width: 3px; }
+.mcs-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
+[data-theme="light"] .mcs-list {
+  background: #ffffff;
+  box-shadow: 0 12px 36px rgba(14,18,35,.18);
+  scrollbar-color: rgba(14,18,35,.12) transparent;
+}
+[data-theme="light"] .mcs-list::-webkit-scrollbar-thumb { background: rgba(14,18,35,.14); }
+.mcs.open .mcs-list { opacity: 1; transform: none; pointer-events: auto; }
+.mcs-option {
+  padding: 8px 11px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background .12s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mcs-option[data-value=""] { color: var(--faint); }
+.mcs-option:hover { background: rgba(124,106,245,.10); }
+[data-theme="light"] .mcs-option:hover { background: rgba(108,92,231,.08); }
+.mcs-option.selected {
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(124,106,245,.06);
 }
 
 /* 버튼 행 — home.html 취소/확인 버튼 */

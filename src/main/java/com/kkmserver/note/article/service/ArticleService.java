@@ -1,7 +1,9 @@
 package com.kkmserver.note.article.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +66,14 @@ public class ArticleService {
     @Transactional
     public void delete(Long id) {
         repository.deleteById(id);
+    }
+
+    public Map<Long, Long> countGroupedBySubjectId() {
+        return repository.countGroupedBySubjectId().stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
     }
 
     @Transactional

@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
+import com.kkmserver.note.article.service.ArticleService;
 import com.kkmserver.note.subject.domain.Subject;
 import com.kkmserver.note.subject.payload.SubjectRequest;
 import com.kkmserver.note.subject.payload.SubjectResponse;
@@ -28,11 +31,17 @@ import lombok.AllArgsConstructor;
 public class SubjectController {
 
     private final SubjectService service;
+    private final ArticleService articleService;
 
     @GetMapping
     public ResponseEntity<List<SubjectResponse>> list() {
+        java.util.Map<Long, Long> articleCounts = articleService.countGroupedBySubjectId();
         List<SubjectResponse> list = service.findAll().stream()
-                .map(SubjectResponse::fromEntity)
+                .map(s -> {
+                    SubjectResponse r = SubjectResponse.fromEntity(s);
+                    r.setArticleCount(articleCounts.getOrDefault(s.getId(), 0L).intValue());
+                    return r;
+                })
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
