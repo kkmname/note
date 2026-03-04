@@ -407,9 +407,30 @@ html, body { overflow: hidden; height: 100%; }
   border-radius: 10px !important;
   padding: 16px 18px !important;
   overflow-x: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,106,245,.65) transparent;
 }
 [data-theme="light"] .editor-body .editor-preview pre,
 [data-theme="light"] .editor-body .editor-preview-side pre { background: rgba(14,18,35,.06) !important; }
+.editor-body .editor-preview pre::-webkit-scrollbar,
+.editor-body .editor-preview-side pre::-webkit-scrollbar {
+  height: 7px;
+}
+.editor-body .editor-preview pre::-webkit-scrollbar-track,
+.editor-body .editor-preview-side pre::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+.editor-body .editor-preview pre::-webkit-scrollbar-thumb,
+.editor-body .editor-preview-side pre::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(124,106,245,.75), rgba(176,126,248,.65));
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.25);
+}
+[data-theme="light"] .editor-body .editor-preview pre::-webkit-scrollbar-thumb,
+[data-theme="light"] .editor-body .editor-preview-side pre::-webkit-scrollbar-thumb {
+  border-color: rgba(255,255,255,.6);
+}
 .editor-body .editor-preview pre code,
 .editor-body .editor-preview-side pre code { background: none !important; padding: 0 !important; }
 
