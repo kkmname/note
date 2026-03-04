@@ -16,7 +16,9 @@ const Home = (() => {
     /* ==================================================
         Variables & Constants
     ================================================== */
-    let mdeInstance  = null;
+    let mdeInstance      = null;
+    let mdeTimer         = null;
+    let mdePreviewTimer  = null;
     let currentNote  = null;
     let isEditMode   = false;
     let ctxTarget    = null;
@@ -123,8 +125,8 @@ const Home = (() => {
             deleteItem(saved);
         });
 
-        document.addEventListener("click", (e) => {
-            if (!e.target.closest("#ctxMenu")) closeCtxMenu();
+        document.addEventListener("mousedown", (e) => {
+            if (ctxMenu.classList.contains("show") && !e.target.closest("#ctxMenu")) closeCtxMenu();
         });
 
         sidebarBody.addEventListener("contextmenu", (e) => {
@@ -208,8 +210,6 @@ const Home = (() => {
         Render Tree
     ================================================== */
     async function renderTree() {
-        treeEl.innerHTML = "";
-
         try {
             subjectCache = await Subject_API.getSubjects();
         } catch (e) {
@@ -217,19 +217,23 @@ const Home = (() => {
             return;
         }
 
+        const frag = document.createDocumentFragment();
         const roots = subjectCache
             .filter(s => (s.parentId ?? null) === null)
             .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-        roots.forEach(s => treeEl.appendChild(makeSubjectItem(s)));
-
-        noteCount.textContent = subjectCache.length + "개의 폴더";
+        roots.forEach(s => frag.appendChild(makeSubjectItem(s)));
 
         if (subjectCache.length === 0) {
             const hint = document.createElement("li");
             hint.className   = "tree-empty";
             hint.textContent = "폴더가 없습니다.";
-            treeEl.appendChild(hint);
+            frag.appendChild(hint);
         }
+
+        treeEl.innerHTML = "";
+        treeEl.appendChild(frag);
+
+        noteCount.textContent = subjectCache.length + "개의 폴더";
 
         if (currentNote) highlightNote(currentNote.id);
     }
@@ -312,13 +316,6 @@ const Home = (() => {
         li.appendChild(row);
         li.appendChild(childrenEl);
 
-        if (sessionStorage.getItem("subject-open:" + subject.id) === "1") {
-            childrenEl.classList.add("open");
-            row.querySelector(".tree-chevron").classList.add("open");
-            row.querySelector(".folder-emoji").textContent = "\u{1F4C2}";
-            loadNotesIntoFolder(subject.id, childrenEl);
-        }
-
         return li;
     }
 
@@ -330,15 +327,22 @@ const Home = (() => {
         - 기존 note row를 먼저 제거 후 재삽입 (안전장치)
     ================================================== */
     async function loadNotesIntoFolder(subjectId, childrenEl) {
-        if (childrenEl.dataset.notesLoaded === "1") return;
+        if (childrenEl.dataset.notesLoaded === "1") {
+            /* 이미 로드됨 — 직접 자식 note row 수만 반환 (중첩 폴더 제외) */
+            return childrenEl.querySelectorAll(":scope > .tree-note-row").length;
+        }
+        /* fetch 시작 전에 즉시 flag 세팅 → 동시 호출로 인한 중복 실행 방지 */
+        childrenEl.dataset.notesLoaded = "1";
 
         let articles = [];
         try {
             articles = await Article_API.getArticlesBySubject(subjectId);
             if (articles.content) articles = articles.content;
         } catch (e) {
+            /* 실패 시 flag 초기화해서 재시도 가능하게 */
+            childrenEl.dataset.notesLoaded = "0";
             toast("노트 목록을 불러오지 못했습니다.");
-            return;
+            return 0;
         }
 
         /* 기존 note row 제거 후 이름순 정렬하여 재삽입 */
@@ -346,12 +350,9 @@ const Home = (() => {
         articles
             .sort((a, b) => (a.title || "").localeCompare(b.title || "", "ko"))
             .forEach(article => childrenEl.appendChild(makeNoteRow(article)));
-        childrenEl.dataset.notesLoaded = "1";
 
-        const li       = childrenEl.closest(".tree-folder-item");
-        const badge    = li ? li.querySelector(":scope > .tree-folder-row .tree-folder-count") : null;
-        const subCount = subjectCache.filter(s => s.parentId === Number(subjectId)).length;
-        if (badge) badge.textContent = subCount + articles.length;
+        /* 실제 로드된 article 수 반환 — 호출자가 badge 업데이트에 사용 */
+        return articles.length;
     }
 
     function makeNoteRow(article) {
@@ -395,14 +396,25 @@ const Home = (() => {
         const childrenEl = li.querySelector(".tree-children");
         const chevron    = li.querySelector(".tree-chevron");
         const emoji      = li.querySelector(".folder-emoji");
-        const isOpen     = childrenEl.classList.toggle("open");
+        const isOpen     = !childrenEl.classList.contains("open");
 
         chevron.classList.toggle("open", isOpen);
         emoji.textContent = isOpen ? "\u{1F4C2}" : "\u{1F4C1}";
 
-        if (isOpen) await loadNotesIntoFolder(subjectId, childrenEl);
-
-        try { sessionStorage.setItem("subject-open:" + subjectId, isOpen ? "1" : "0"); } catch (e) {}
+        if (isOpen) {
+            childrenEl.classList.add("open");
+            childrenEl.classList.add("slide-in");
+            childrenEl.addEventListener("animationend", () =>
+                childrenEl.classList.remove("slide-in")
+            , { once: true });
+            const articleCount = await loadNotesIntoFolder(subjectId, childrenEl);
+            /* badge 갱신 — loadNotesIntoFolder 반환값 직접 사용 (DOM 쿼리 제거) */
+            const badge    = li.querySelector(":scope > .tree-folder-row .tree-folder-count");
+            const subCount = subjectCache.filter(s => s.parentId === Number(subjectId)).length;
+            if (badge) badge.textContent = subCount + articleCount;
+        } else {
+            childrenEl.classList.remove("open");
+        }
     }
 
     function highlightNote(noteId) {
@@ -494,7 +506,6 @@ const Home = (() => {
         editorTitle.classList.remove("placeholder");
         editorActions.style.display  = "flex";
         editorEmpty.style.display    = "none";
-        mdeTarget.style.display      = "";
         editModeBtnText.textContent  = "편집";
 
         highlightNote(article.id);
@@ -515,12 +526,21 @@ const Home = (() => {
         EasyMDE
     ================================================== */
     function initMDE(content, editMode) {
+        // 이전에 예약된 타이머가 있으면 모두 취소
+        if (mdeTimer !== null)        { clearTimeout(mdeTimer);        mdeTimer        = null; }
+        if (mdePreviewTimer !== null) { clearTimeout(mdePreviewTimer); mdePreviewTimer = null; }
+
         if (mdeInstance) {
             try { mdeInstance.toTextArea(); } catch (e) {}
             mdeInstance = null;
         }
+        // toTextArea()가 display를 복원할 수 있으므로 즉시 다시 숨김
+        mdeTarget.style.display = "none";
 
-        setTimeout(() => {
+        mdeTimer = setTimeout(() => {
+            mdeTimer = null;
+            mdeTarget.value = content;   /* initialValue가 ""일 때 EasyMDE가 무시하는 버그 방어 */
+            mdeTarget.style.display = "";
             mdeInstance = new EasyMDE({
                 element:      mdeTarget,
                 initialValue: content,
@@ -545,10 +565,14 @@ const Home = (() => {
             });
 
             if (!editMode) {
-                setTimeout(() => {
+                const mdeContainer = mdeTarget.parentElement;
+                if (mdeContainer) mdeContainer.style.visibility = "hidden";
+                mdePreviewTimer = setTimeout(() => {
+                    mdePreviewTimer = null;
                     if (mdeInstance && !mdeInstance.isPreviewActive()) {
                         mdeInstance.togglePreview();
                     }
+                    if (mdeContainer) mdeContainer.style.visibility = "";
                 }, 30);
             }
         }, 60);
@@ -617,6 +641,9 @@ const Home = (() => {
         Clear Editor
     ================================================== */
     function clearEditor() {
+        if (mdeTimer !== null)        { clearTimeout(mdeTimer);        mdeTimer        = null; }
+        if (mdePreviewTimer !== null) { clearTimeout(mdePreviewTimer); mdePreviewTimer = null; }
+
         currentNote = null;
         isEditMode  = false;
 

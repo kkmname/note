@@ -113,13 +113,19 @@ html, body { overflow: hidden; height: 100%; }
   list-style: none;
   margin: 0;
   padding: 0 0 0 16px;
-  overflow: hidden;
-  max-height: 0;
-  transition: max-height .3s var(--ease);
+  display: none;
   border-left: 1px solid var(--border);
   margin-left: 11px;
 }
-.tree-children.open { max-height: 9999px; }
+.tree-children.open { display: block; }
+/* 사용자가 직접 열 때만 슬라이드 애니메이션 */
+.tree-children.open.slide-in {
+  animation: treeFolderOpen .2s ease;
+}
+@keyframes treeFolderOpen {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 /* 중첩 레벨이 깊어질수록 트리 라인 투명도 점진 */
 .tree-children .tree-children { opacity: 1; }
 [data-theme="light"] .tree-children { border-left-color: rgba(14,18,35,.12); }
