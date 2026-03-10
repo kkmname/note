@@ -27,6 +27,7 @@ const Home = (() => {
     let subjectCache = [];
     let dnd          = null; /* [FIX-2] { type, noteId?, subjectId?, fromSubjectId?, el } */
     let _mcsVal      = "";   /* 커스텀 폴더 셀렉트 현재 선택값 */
+    const articleCache = new Map(); /* subjectId(number) → Article[] : 노트 전역 캐시 */
 
     const LS_THEME = "journal:theme";
     const SS_AUTH  = "note:auth";
@@ -237,7 +238,15 @@ const Home = (() => {
         );
 
         try {
-            subjectCache = await Subject_API.getSubjects();
+            const tree   = await Subject_API.getTree();
+            subjectCache = tree.subjects;
+            /* articleCache 전체 갱신 — contents 제외 경량 데이터 */
+            articleCache.clear();
+            if (tree.articles) {
+                Object.entries(tree.articles).forEach(([sid, arts]) =>
+                    articleCache.set(Number(sid), arts)
+                );
+            }
         } catch (e) {
             toast("폴더 목록을 불러오지 못했습니다.");
             return;
@@ -370,38 +379,40 @@ const Home = (() => {
 
     /* ==================================================
         Load Notes Into Folder
-        [FIX-1] 닫았다 열어도 중복 방지
-        - notesLoaded="1" 이면 스킵
-        - 강제 갱신 필요 시 호출 전 "0"으로 세팅
-        - 기존 note row를 먼저 제거 후 재삽입 (안전장치)
+        — 전역 articleCache(Map) 사용으로 renderTree() 후에도 캐시 유지
+        — 중복 fetch 방지: Map에 [] 선점 후 fetch, 실패 시 delete
     ================================================== */
     async function loadNotesIntoFolder(subjectId, childrenEl) {
-        if (childrenEl.dataset.notesLoaded === "1") {
-            /* 이미 로드됨 — 직접 자식 note row 수만 반환 (중첩 폴더 제외) */
-            return childrenEl.querySelectorAll(":scope > .tree-note-row").length;
+        const numId = Number(subjectId);
+        if (articleCache.has(numId)) {
+            /* 캐시 히트 — API 호출 없이 DOM만 갱신 */
+            _renderNotes(childrenEl, articleCache.get(numId));
+            return articleCache.get(numId).length;
         }
-        /* fetch 시작 전에 즉시 flag 세팅 → 동시 호출로 인한 중복 실행 방지 */
-        childrenEl.dataset.notesLoaded = "1";
+        /* 중복 fetch 방지 — 빈 배열로 선점 */
+        articleCache.set(numId, []);
 
         let articles = [];
         try {
             articles = await Article_API.getArticlesBySubject(subjectId);
             if (articles.content) articles = articles.content;
         } catch (e) {
-            /* 실패 시 flag 초기화해서 재시도 가능하게 */
-            childrenEl.dataset.notesLoaded = "0";
+            articleCache.delete(numId);   /* 실패 시 제거 → 재시도 가능 */
             toast("노트 목록을 불러오지 못했습니다.");
             return 0;
         }
 
-        /* 기존 note row 제거 후 이름순 정렬하여 재삽입 */
+        articleCache.set(numId, articles);
+        _renderNotes(childrenEl, articles);
+        return articles.length;
+    }
+
+    /* 노트 row 목록을 이름순 정렬 후 DOM에 반영 */
+    function _renderNotes(childrenEl, articles) {
         childrenEl.querySelectorAll(".tree-note-row").forEach(el => el.remove());
-        articles
+        [...articles]
             .sort((a, b) => (a.title || "").localeCompare(b.title || "", "ko"))
             .forEach(article => childrenEl.appendChild(makeNoteRow(article)));
-
-        /* 실제 로드된 article 수 반환 — 호출자가 badge 업데이트에 사용 */
-        return articles.length;
     }
 
     function makeNoteRow(article) {
@@ -492,9 +503,23 @@ const Home = (() => {
         try {
             await Article_API.moveArticle(noteId, toSubjectId);
             toast("노트 이동 완료");
-            invalidateFolder(fromSubjectId);
-            invalidateFolder(toSubjectId);
-            await renderTree();
+            /* 캐시 업데이트 */
+            const article = _cacheRemoveNote(fromSubjectId, noteId);
+            if (article) {
+                article.subjectId = toSubjectId != null ? Number(toSubjectId) : null;
+                if (toSubjectId != null && articleCache.has(Number(toSubjectId)))
+                    articleCache.get(Number(toSubjectId)).push(article);
+            }
+            /* DOM 업데이트 */
+            document.querySelector(`.tree-note-row[data-note-id="${noteId}"]`)?.remove();
+            _updateFolderBadge(fromSubjectId);
+            if (toSubjectId != null) {
+                const toLi = document.querySelector(`.tree-folder-item[data-subject-id="${toSubjectId}"]`);
+                const toCh = toLi?.querySelector(".tree-children");
+                if (toCh && toCh.classList.contains("open") && article)
+                    _insertNoteRowSorted(toCh, makeNoteRow(article), article.title || "");
+                _updateFolderBadge(toSubjectId);
+            }
             if (currentNote && String(currentNote.id) === String(noteId))
                 currentNote.subjectId = toSubjectId;
         } catch (e) { toast("노트 이동에 실패했습니다."); }
@@ -509,7 +534,24 @@ const Home = (() => {
         try {
             await Subject_API.moveSubject(subjectId, intoSubjectId ?? null);
             toast("폴더 이동 완료");
-            await renderTree();
+            /* 캐시 업데이트 */
+            const subject     = subjectCache.find(s => String(s.id) === String(subjectId));
+            const oldParentId = subject ? (subject.parentId ?? null) : null;
+            if (subject) subject.parentId = intoSubjectId ?? null;
+            /* DOM 업데이트 */
+            const li = document.querySelector(`.tree-folder-item[data-subject-id="${subjectId}"]`);
+            if (li) {
+                li.remove();
+                if (intoSubjectId == null) {
+                    _insertSubjectSorted(treeEl, li, subject?.name || "");
+                } else {
+                    const toLi = document.querySelector(`.tree-folder-item[data-subject-id="${intoSubjectId}"]`);
+                    const toCh = toLi?.querySelector(".tree-children");
+                    if (toCh) _insertSubjectSorted(toCh, li, subject?.name || "");
+                }
+            }
+            _updateFolderBadge(oldParentId);
+            _updateFolderBadge(intoSubjectId);
         } catch (e) { toast("폴더 이동에 실패했습니다."); }
     }
 
@@ -535,9 +577,70 @@ const Home = (() => {
 
     function invalidateFolder(subjectId) {
         if (subjectId == null) return;
-        const li = document.querySelector('[data-subject-id="' + subjectId + '"]');
-        const ch = li ? li.querySelector(".tree-children") : null;
-        if (ch) ch.dataset.notesLoaded = "0";
+        articleCache.delete(Number(subjectId));
+    }
+
+    /* ==================================================
+        DOM / Cache 헬퍼
+    ================================================== */
+
+    /* 폴더 배지(아이템 수) 갱신 */
+    function _updateFolderBadge(subjectId) {
+        if (subjectId == null) return;
+        const numId    = Number(subjectId);
+        const li       = document.querySelector(`.tree-folder-item[data-subject-id="${numId}"]`);
+        const badge    = li?.querySelector(":scope > .tree-folder-row .tree-folder-count");
+        if (!badge) return;
+        const subCount = subjectCache.filter(s => s.parentId === numId).length;
+        const artCount = articleCache.has(numId) ? articleCache.get(numId).length : 0;
+        badge.textContent = subCount + artCount;
+    }
+
+    /* articleCache에서 노트를 제거하고 반환 */
+    function _cacheRemoveNote(subjectId, noteId) {
+        const numId = Number(subjectId);
+        if (!articleCache.has(numId)) return null;
+        const arr = articleCache.get(numId);
+        const idx = arr.findIndex(a => String(a.id) === String(noteId));
+        return idx === -1 ? null : arr.splice(idx, 1)[0];
+    }
+
+    /* subjectCache + articleCache에서 폴더(하위 포함) 전체 제거 */
+    function _removeSubjectFromCache(subjectId) {
+        const numId = Number(subjectId);
+        subjectCache
+            .filter(s => s.parentId === numId)
+            .forEach(c => _removeSubjectFromCache(c.id));
+        articleCache.delete(numId);
+        const idx = subjectCache.findIndex(s => s.id === numId);
+        if (idx !== -1) subjectCache.splice(idx, 1);
+    }
+
+    /* 컨테이너 안에 폴더 li를 이름순으로 삽입 (폴더 뒤, 노트 행 앞) */
+    function _insertSubjectSorted(container, li, name) {
+        const siblings = [...container.querySelectorAll(":scope > .tree-folder-item")];
+        let before = null;
+        for (const el of siblings) {
+            const elName = el.querySelector(":scope > .tree-folder-row .tree-folder-name")?.textContent || "";
+            if ((name || "").localeCompare(elName, "ko") < 0) { before = el; break; }
+        }
+        if (before) {
+            container.insertBefore(li, before);
+        } else {
+            const firstNote = container.querySelector(":scope > .tree-note-row");
+            container.insertBefore(li, firstNote ?? null);
+        }
+    }
+
+    /* 열린 폴더의 childrenEl 안에 노트 row를 이름순으로 삽입 */
+    function _insertNoteRowSorted(childrenEl, row, title) {
+        const siblings = [...childrenEl.querySelectorAll(":scope > .tree-note-row")];
+        let before = null;
+        for (const el of siblings) {
+            const elName = el.querySelector(".tree-note-name")?.textContent || "";
+            if ((title || "").localeCompare(elName, "ko") < 0) { before = el; break; }
+        }
+        childrenEl.insertBefore(row, before ?? null);
     }
 
     /* ==================================================
@@ -746,15 +849,15 @@ const Home = (() => {
 
         const li = document.querySelector('.tree-folder-item[data-subject-id="' + subjectId + '"]');
         if (li) {
-            const ch = li.querySelector(".tree-children");
-            ch.dataset.notesLoaded = "0";
+            const ch    = li.querySelector(".tree-children");
+            const numId = Number(subjectId);
+            /* 캐시에 새 노트 추가 (캐시 존재 시 push, 없으면 다음 열기 때 fetch) */
+            if (articleCache.has(numId)) articleCache.get(numId).push(article);
             if (!ch.classList.contains("open")) {
                 await toggleSubjectFolder(li, subjectId);
             } else {
-                const articleCount = await loadNotesIntoFolder(subjectId, ch);
-                const badge    = li.querySelector(":scope > .tree-folder-row .tree-folder-count");
-                const subCount = subjectCache.filter(s => s.parentId === Number(subjectId)).length;
-                if (badge) badge.textContent = subCount + articleCount;
+                _renderNotes(ch, articleCache.get(numId) ?? []);
+                _updateFolderBadge(subjectId);
             }
         }
         await openNote(article.id);
@@ -766,9 +869,22 @@ const Home = (() => {
     ================================================== */
     async function createSubject(name, parentId) {
         try {
-            await Subject_API.saveSubject({ name, parentId: parentId ?? null, sortOrder: 0 });
+            const saved = await Subject_API.saveSubject({ name, parentId: parentId ?? null, sortOrder: 0 });
             toast("'" + name + "' 폴더 생성됨");
-            await renderTree();
+            /* 캐시 업데이트 */
+            subjectCache.push(saved);
+            /* DOM 업데이트 */
+            const newLi = makeSubjectItem(saved);
+            if (parentId == null) {
+                treeEl.querySelector(".tree-empty")?.remove();
+                _insertSubjectSorted(treeEl, newLi, name);
+            } else {
+                const parentLi = document.querySelector(`.tree-folder-item[data-subject-id="${parentId}"]`);
+                const parentCh = parentLi?.querySelector(".tree-children");
+                if (parentCh) _insertSubjectSorted(parentCh, newLi, name);
+            }
+            _updateFolderBadge(parentId);
+            noteCount.textContent = subjectCache.length + "개의 폴더";
         } catch (e) {
             toast("폴더 생성에 실패했습니다.");
         }
@@ -784,12 +900,28 @@ const Home = (() => {
                     parentId:  subject?.parentId  ?? null,
                     sortOrder: subject?.sortOrder  ?? 0,
                 });
+                /* 캐시 업데이트 */
+                if (subject) subject.name = newName;
+                /* DOM 업데이트 */
+                const li     = document.querySelector(`.tree-folder-item[data-subject-id="${target.subjectId}"]`);
+                const nameEl = li?.querySelector(":scope > .tree-folder-row .tree-folder-name");
+                if (nameEl) nameEl.textContent = newName;
+                if (li) { const p = li.parentElement; li.remove(); _insertSubjectSorted(p, li, newName); }
             } else if (target.type === "note") {
                 await Article_API.saveArticle({
                     id:        target.noteId,
                     title:     newName,
                     subjectId: target.subjectId ?? null,
                 });
+                /* 캐시 업데이트 */
+                const numId = Number(target.subjectId);
+                const art   = articleCache.get(numId)?.find(a => String(a.id) === String(target.noteId));
+                if (art) art.title = newName;
+                /* DOM 업데이트 */
+                const row    = document.querySelector(`.tree-note-row[data-note-id="${target.noteId}"]`);
+                const nameEl = row?.querySelector(".tree-note-name");
+                if (nameEl) nameEl.textContent = newName;
+                if (row) { const p = row.parentElement; row.remove(); _insertNoteRowSorted(p, row, newName); }
                 if (currentNote?.id === target.noteId) {
                     currentNote.title       = newName;
                     editorTitle.textContent = newName;
@@ -797,7 +929,6 @@ const Home = (() => {
                 }
             }
             toast("이름이 변경되었습니다.");
-            await renderTree();
         } catch (e) {
             toast("이름 변경에 실패했습니다.");
         }
@@ -807,12 +938,31 @@ const Home = (() => {
         try {
             if (target.type === "subject") {
                 await Subject_API.deleteSubject(target.subjectId);
+                /* DOM 업데이트 전에 parentLi 확보 */
+                const li       = document.querySelector(`.tree-folder-item[data-subject-id="${target.subjectId}"]`);
+                const parentLi = li?.parentElement?.closest(".tree-folder-item");
+                /* 캐시 업데이트 (하위 폴더/노트 포함) */
+                _removeSubjectFromCache(target.subjectId);
+                /* DOM 업데이트 */
+                li?.remove();
+                if (parentLi) _updateFolderBadge(parentLi.dataset.subjectId);
+                noteCount.textContent = subjectCache.length + "개의 폴더";
+                if (subjectCache.length === 0) {
+                    const hint = document.createElement("li");
+                    hint.className   = "tree-empty";
+                    hint.textContent = "폴더가 없습니다.";
+                    treeEl.appendChild(hint);
+                }
             } else if (target.type === "note") {
                 await Article_API.deleteArticle(target.noteId);
+                /* 캐시 업데이트 */
+                _cacheRemoveNote(target.subjectId, target.noteId);
+                /* DOM 업데이트 */
+                document.querySelector(`.tree-note-row[data-note-id="${target.noteId}"]`)?.remove();
+                _updateFolderBadge(target.subjectId);
                 if (currentNote?.id === target.noteId) clearEditor();
             }
             toast("삭제되었습니다.");
-            await renderTree();
         } catch (e) {
             toast("삭제에 실패했습니다.");
         }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
+import com.kkmserver.note.article.payload.ArticleResponse;
 import com.kkmserver.note.article.service.ArticleService;
 import com.kkmserver.note.subject.domain.Subject;
 import com.kkmserver.note.subject.payload.SubjectRequest;
@@ -78,5 +79,25 @@ public class SubjectController {
         Long parentId = body.get("parentId");
         Subject moved = service.move(id, parentId);
         return ResponseEntity.ok(SubjectResponse.fromEntity(moved));
+    }
+
+    /** 트리 전체 데이터 일괄 반환 — subjects + contents 제외 article 요약정보 */
+    @GetMapping("/tree")
+    public ResponseEntity<Map<String, Object>> tree() {
+        Map<Long, Long> counts = articleService.countGroupedBySubjectId();
+        List<SubjectResponse> subjects = service.findAll().stream()
+                .map(s -> {
+                    SubjectResponse r = SubjectResponse.fromEntity(s);
+                    r.setArticleCount(counts.getOrDefault(s.getId(), 0L).intValue());
+                    return r;
+                })
+                .collect(Collectors.toList());
+        Map<Long, List<ArticleResponse>> articles = articleService.findAll().stream()
+                .filter(a -> a.getSubjectId() != null)
+                .collect(Collectors.groupingBy(
+                        com.kkmserver.note.article.domain.Article::getSubjectId,
+                        Collectors.mapping(ArticleResponse::fromEntitySummary, Collectors.toList())
+                ));
+        return ResponseEntity.ok(Map.of("subjects", subjects, "articles", articles));
     }
 }

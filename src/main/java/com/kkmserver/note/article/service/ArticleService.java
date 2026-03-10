@@ -20,6 +20,10 @@ public class ArticleService {
 
     private final ArticleRepository repository;
 
+    public List<Article> findAll() {
+        return repository.findAll();
+    }
+
     public List<Article> findBySubjectId(Long subjectId) {
         if (subjectId == null) {
             return repository.findBySubjectIdIsNull();

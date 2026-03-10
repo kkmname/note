@@ -11,6 +11,14 @@ const Subject_API = (() => {
         return await response.json();
     }
 
+    async function getTree() {
+        const response = await fetch("/api/v1/subject/tree");
+        if (!response.ok) {
+            throw new Error("Failed to fetch tree");
+        }
+        return await response.json();
+    }
+
     async function getSubject(id) {
         const response = await fetch(`/api/v1/subject/${id}`);
         if (!response.ok) {
@@ -60,6 +68,7 @@ const Subject_API = (() => {
     ================================================== */
     return {
         getSubjects,
+        getTree,
         getSubject,
         saveSubject,
         deleteSubject,

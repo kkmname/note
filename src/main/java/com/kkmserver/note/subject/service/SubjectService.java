@@ -1,7 +1,9 @@
 package com.kkmserver.note.subject.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,17 +66,17 @@ public class SubjectService {
     }
 
     /**
-     * Walk upwards from checkId and see if we encounter ancestorId.
+     * ancestorId가 checkId의 조상인지 확인.
+     * 맨 맨 findById 대신 전체 목록을 Map으로 한 번만 SELECT 후 메모리 내 순회.
      */
     private boolean isDescendant(Long ancestorId, Long checkId) {
+        Map<Long, Long> parentMap = repository.findAll().stream()
+                .filter(s -> s.getParentId() != null)
+                .collect(Collectors.toMap(Subject::getId, Subject::getParentId));
         Long current = checkId;
         while (current != null) {
-            if (current.equals(ancestorId)) {
-                return true;
-            }
-            Optional<Subject> opt = repository.findById(current);
-            if (opt.isEmpty()) break;
-            current = opt.get().getParentId();
+            if (current.equals(ancestorId)) return true;
+            current = parentMap.get(current);
         }
         return false;
     }

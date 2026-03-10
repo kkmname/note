@@ -28,6 +28,18 @@ public class ArticleResponse {
         return r;
     }
 
+    /** 트리 표시용 — contents 제외 경량 버전 */
+    public static ArticleResponse fromEntitySummary(Article a) {
+        if (a == null) return null;
+        ArticleResponse r = new ArticleResponse();
+        r.setId(a.getId());
+        r.setTitle(a.getTitle());
+        r.setSubjectId(a.getSubjectId());
+        r.setCreatedAt(a.getCreatedAt());
+        r.setModifiedAt(a.getModifiedAt());
+        return r;
+    }
+
     public Long getId() {
         return id;
     }
