@@ -84,7 +84,7 @@ const Home = (() => {
             if (subjectCache.length === 0) { toast("먼저 폴더를 만들어주세요."); return; }
             openModal("새 노트", "노트 제목", true, (name) => {
                 const subjectId = _mcsVal ? Number(_mcsVal) : null;
-                if (!subjectId) { toast("폴더를 선택해주세요."); return; }
+                if (!subjectId) { toast("폴더를 선택해주세요."); return false; /* 모달 유지 */}
                 createNote(name, subjectId);
             });
         });
@@ -160,12 +160,12 @@ const Home = (() => {
             }
         });
 
-        /* [FIX-2] Sidebar body: 루트 드롭 타겟 */
+        /* Sidebar body: 루트 드롭 타겟 (subject만 허용, note는 반드시 폴더 안에 있어야 함) */
         sidebarBody.addEventListener("dragover", (e) => {
             if (!dnd) return;
             if (e.target.closest(".tree-folder-row")) return;
             if (e.target.closest(".tree-note-row")) return;
-            if (dnd.type === "note"    && dnd.fromSubjectId === null) return;
+            if (dnd.type === "note") return;   /* 노트는 root 드롭 불가 */
             if (dnd.type === "subject" && isSubjectRoot(dnd.subjectId)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
@@ -181,8 +181,7 @@ const Home = (() => {
             if (e.target.closest(".tree-folder-row")) return;
             if (e.target.closest(".tree-note-row")) return;
             e.preventDefault();
-            if (dnd.type === "note"    && dnd.fromSubjectId !== null) moveNote(dnd.noteId, dnd.fromSubjectId, null);
-            if (dnd.type === "subject")                                moveSubject(dnd.subjectId, null);
+            if (dnd.type === "subject") moveSubject(dnd.subjectId, null); /* subject만 root 이동 허용 */
             endDnd();
         });
 
@@ -945,7 +944,10 @@ const Home = (() => {
     function submitModal() {
         const name = modalInput.value.trim();
         if (!name) { toast("이름을 입력해주세요."); return; }
-        if (modalAction) modalAction(name);
+        if (modalAction) {
+            const result = modalAction(name);
+            if (result === false) return; /* 유효성 검사 실패 — 모달 유지 */
+        }
         closeModal();
     }
 
