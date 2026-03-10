@@ -391,8 +391,8 @@ html, body { overflow: hidden; height: 100%; }
 .editor-body .editor-preview a,
 .editor-body .editor-preview-side a { color: var(--accent) !important; text-decoration: underline !important; }
 
-.editor-body .editor-preview code,
-.editor-body .editor-preview-side code {
+.editor-body .editor-preview code:not(pre code),
+.editor-body .editor-preview-side code:not(pre code) {
   font-family: var(--mono) !important;
   font-size: .87em !important;
   background: rgba(124,106,245,.10) !important;
@@ -432,7 +432,13 @@ html, body { overflow: hidden; height: 100%; }
   border-color: rgba(255,255,255,.6);
 }
 .editor-body .editor-preview pre code,
-.editor-body .editor-preview-side pre code { background: none !important; padding: 0 !important; }
+.editor-body .editor-preview-side pre code {
+  background: none !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  border-radius: 0 !important;
+  /* highlight.js 토큰 색상을 덮어쓰지 않도록 color 초기화 제거 */
+}
 
 .editor-body .editor-preview blockquote,
 .editor-body .editor-preview-side blockquote {

@@ -164,6 +164,7 @@ const Home = (() => {
         sidebarBody.addEventListener("dragover", (e) => {
             if (!dnd) return;
             if (e.target.closest(".tree-folder-row")) return;
+            if (e.target.closest(".tree-note-row")) return;
             if (dnd.type === "note"    && dnd.fromSubjectId === null) return;
             if (dnd.type === "subject" && isSubjectRoot(dnd.subjectId)) return;
             e.preventDefault();
@@ -178,6 +179,7 @@ const Home = (() => {
             sidebarBody.classList.remove("dnd-root-over");
             if (!dnd) return;
             if (e.target.closest(".tree-folder-row")) return;
+            if (e.target.closest(".tree-note-row")) return;
             e.preventDefault();
             if (dnd.type === "note"    && dnd.fromSubjectId !== null) moveNote(dnd.noteId, dnd.fromSubjectId, null);
             if (dnd.type === "subject")                                moveSubject(dnd.subjectId, null);
@@ -204,14 +206,24 @@ const Home = (() => {
     function loadTheme() {
         const saved = localStorage.getItem(LS_THEME);
         const pref  = window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        document.documentElement.dataset.theme = (saved === "light" || saved === "dark") ? saved : pref;
+        const theme = (saved === "light" || saved === "dark") ? saved : pref;
+        document.documentElement.dataset.theme = theme;
+        applyHljsTheme(theme);
     }
 
     function toggleTheme() {
         const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
         document.documentElement.dataset.theme = next;
+        applyHljsTheme(next);
         try { localStorage.setItem(LS_THEME, next); } catch (e) {}
         toast(next === "dark" ? "다크 모드" : "라이트 모드");
+    }
+
+    function applyHljsTheme(theme) {
+        const dark  = document.getElementById("hljs-dark");
+        const light = document.getElementById("hljs-light");
+        if (dark)  dark.disabled  = (theme === "light");
+        if (light) light.disabled = (theme !== "light");
     }
 
     /* ==================================================
@@ -604,6 +616,9 @@ const Home = (() => {
                     "preview", "side-by-side", "fullscreen", "|",
                     "guide",
                 ],
+                renderingConfig: {
+                    codeSyntaxHighlighting: true,
+                },
             });
 
             if (!editMode) {
