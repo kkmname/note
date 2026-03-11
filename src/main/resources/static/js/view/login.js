@@ -41,6 +41,9 @@ const Login = (() => {
     const pwIcon            = $("#pwEyeIcon");
     const toastEl           = $("#toast");
     const toastTxt          = $("#toastText");
+    const otpForm           = $("#otpForm");
+    const otpCode           = $("#otpCode");
+    const otpBackBtn        = $("#otpBackBtn");
 
     /* ==================================================
         Event Handlers
@@ -48,6 +51,9 @@ const Login = (() => {
     function eventHandlers() {
         themeBtn.addEventListener("click", toggleTheme);
         loginForm.addEventListener("submit", handleLogin);
+        otpForm.addEventListener("submit", handleOtp);
+        otpBackBtn.addEventListener("click", showLoginStep);
+        otpCode.addEventListener("input", () => $("#otpError").classList.remove("show"));
         pwToggle.addEventListener("click", () => {
             const isHidden   = pwInput.type === "password";
             pwInput.type     = isHidden ? "text" : "password";
@@ -129,20 +135,65 @@ const Login = (() => {
         }
 
         try {
-            await Login_API.login(id, pw);
-            toast("로그인 성공");
-            setTimeout(() => location.replace("/home"), 650);
+            const res = await Login_API.login(id, pw);
+            if (res.step === "otp_required") {
+                showOtpStep();
+            } else {
+                toast("로그인 성공");
+                setTimeout(() => location.replace("/home"), 650);
+            }
         } catch (err) {
             showError("아이디 또는 비밀번호가 올바르지 않습니다.");
             $("#loginPw").value = "";
             $("#loginPw").focus();
-
-            /* 카드 흔들기 애니메이션 */
-            const card = document.querySelector(".login-card");
-            card.style.animation = "none";
-            card.offsetHeight;          /* reflow */
-            card.style.animation = "shake .35s var(--ease)";
+            shakeCard();
         }
+    }
+
+    async function handleOtp(e) {
+        e.preventDefault();
+        const code = otpCode.value.trim();
+        if (!code) {
+            showOtpError("OTP 코드를 입력해주세요.");
+            return;
+        }
+        try {
+            await Login_API.verifyOtp(code);
+            toast("로그인 성공");
+            setTimeout(() => location.replace("/home"), 650);
+        } catch (err) {
+            showOtpError("OTP 코드가 올바르지 않습니다.");
+            otpCode.value = "";
+            otpCode.focus();
+            shakeCard();
+        }
+    }
+
+    function showOtpStep() {
+        loginForm.style.display = "none";
+        otpForm.style.display   = "flex";
+        otpCode.value = "";
+        $("#otpError").classList.remove("show");
+        setTimeout(() => otpCode.focus(), 80);
+    }
+
+    function showLoginStep() {
+        otpForm.style.display   = "none";
+        loginForm.style.display = "flex";
+        $("#loginPw").value = "";
+        hideError();
+    }
+
+    function showOtpError(msg) {
+        $("#otpErrorMsg").textContent = msg || "OTP 코드가 올바르지 않습니다.";
+        $("#otpError").classList.add("show");
+    }
+
+    function shakeCard() {
+        const card = document.querySelector(".login-card");
+        card.style.animation = "none";
+        card.offsetHeight;
+        card.style.animation = "shake .35s var(--ease)";
     }
 
     /* ==================================================

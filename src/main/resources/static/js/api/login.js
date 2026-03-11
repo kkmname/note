@@ -6,14 +6,20 @@ const Login_API = (() => {
     async function login(email, password) {
         const response = await fetch('/api/v1/auth/login', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         });
-        if (!response.ok) {
-            throw new Error('login failed');
-        }
+        if (!response.ok) throw new Error('login failed');
+        return await response.json();
+    }
+
+    async function verifyOtp(otp) {
+        const response = await fetch('/api/v1/auth/login/otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp })
+        });
+        if (!response.ok) throw new Error('otp failed');
         return await response.json();
     }
 
@@ -38,6 +44,7 @@ const Login_API = (() => {
     ================================================== */
     return {
         login,
+        verifyOtp,
         status,
         logout
     }

@@ -49,4 +49,8 @@ public class User {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Authority authority = Authority.ROLE_ADMIN;
+
+    /** Google Authenticator TOTP 시크릿 (Base32). null이면 OTP 미설정 상태 */
+    @Column(name = "totp_secret", length = 64)
+    private String totpSecret;
 }

@@ -35,6 +35,7 @@ public class SecurityConfig {
                                     .requestMatchers("/login").permitAll()
                                     .requestMatchers("/api/v1/auth/status").permitAll()
                                     .requestMatchers("/api/v1/auth/login").permitAll()
+                                    .requestMatchers("/api/v1/auth/login/otp").permitAll()
                                     .anyRequest().authenticated()
                    )
                    .formLogin(
